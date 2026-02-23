@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoraShorts - Star in Your Own Drama</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- ============ SCREEN 1: PHOTO UPLOAD ============ -->
+    <div id="upload-screen" class="screen active">
+        <nav class="navbar">
+            <div class="logo">SORA<span>SHORTS</span></div>
+        </nav>
+        <div class="upload-container">
+            <div class="upload-hero">
+                <h1>Star in Your Own Drama</h1>
+                <p class="subtitle">Upload a photo and we'll cast you as the lead in an iconic show</p>
+            </div>
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                </div>
+                <p class="upload-text">Drop your photo here or click to upload</p>
+                <p class="upload-hint">or take a selfie with your camera</p>
+                <input type="file" id="file-input" accept="image/*" hidden>
+                <input type="file" id="camera-input" accept="image/*" capture="user" hidden>
+                <div class="upload-buttons">
+                    <button class="btn btn-primary" id="upload-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17,8 12,3 7,8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Upload Photo
+                    </button>
+                    <button class="btn btn-secondary" id="camera-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                        Take Selfie
+                    </button>
+                </div>
+            </div>
+            <!-- Photo Preview -->
+            <div class="preview-container" id="preview-container" style="display:none">
+                <img id="photo-preview" alt="Your photo">
+                <div class="preview-actions">
+                    <button class="btn btn-secondary" id="retake-btn">Choose Another</button>
+                    <button class="btn btn-primary" id="continue-btn">Continue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ SCREEN 2: SHOW SELECTION (NETFLIX UI) ============ -->
+    <div id="select-screen" class="screen">
+        <nav class="navbar">
+            <div class="logo">SORA<span>SHORTS</span></div>
+            <div class="user-photo-small" id="nav-photo"></div>
+        </nav>
+        <div class="select-container">
+            <h2 class="select-heading">What drama do you see yourself in?</h2>
+            <div class="shows-grid">
+                <div class="show-card" data-show="Fifty Shades of Grey">
+                    <div class="show-poster">
+                        <img src="https://image.tmdb.org/t/p/w500/63kGofUkt1Mx0SIL4XI4Z5AoSgt.jpg" alt="Fifty Shades of Grey">
+                        <div class="show-overlay">
+                            <div class="play-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="show-title">Fifty Shades of Grey</p>
+                </div>
+                <div class="show-card" data-show="Twilight">
+                    <div class="show-poster">
+                        <img src="https://image.tmdb.org/t/p/w500/3Gkb6jm6962ADUPaCBqzz9CTbn9.jpg" alt="Twilight">
+                        <div class="show-overlay">
+                            <div class="play-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="show-title">Twilight</p>
+                </div>
+                <div class="show-card" data-show="Crash Landing on You">
+                    <div class="show-poster">
+                        <img src="https://image.tmdb.org/t/p/w500/fgBNLPr6mC8pxuR79ENAJY4nBmj.jpg" alt="Crash Landing on You">
+                        <div class="show-overlay">
+                            <div class="play-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="show-title">Crash Landing on You</p>
+                </div>
+                <div class="show-card" data-show="Eternal Love">
+                    <div class="show-poster">
+                        <img src="https://image.tmdb.org/t/p/w500/paeDktO7Bx2lmv9mEDiHtneoYrF.jpg" alt="Eternal Love">
+                        <div class="show-overlay">
+                            <div class="play-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="show-title">Eternal Love</p>
+                </div>
+                <div class="show-card" data-show="Crazy Rich Asians">
+                    <div class="show-poster">
+                        <img src="https://image.tmdb.org/t/p/w500/1XxL4LJ5WHdrcYcihEZUCgNCpAW.jpg" alt="Crazy Rich Asians">
+                        <div class="show-overlay">
+                            <div class="play-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="show-title">Crazy Rich Asians</p>
+                </div>
+                <div class="show-card" data-show="My Love from the Star">
+                    <div class="show-poster">
+                        <img src="https://image.tmdb.org/t/p/w500/o5EYVYCVtDUdajP4rWfv6q0BTmm.jpg" alt="My Love from the Star">
+                        <div class="show-overlay">
+                            <div class="play-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="show-title">My Love from the Star</p>
+                </div>
+                <div class="show-card" data-show="Bridgerton">
+                    <div class="show-poster">
+                        <img src="https://image.tmdb.org/t/p/w500/uXTg565ahu9RwonCX1V2Hex1NU6.jpg" alt="Bridgerton">
+                        <div class="show-overlay">
+                            <div class="play-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="show-title">Bridgerton</p>
+                </div>
+                <div class="show-card" data-show="Single's Inferno">
+                    <div class="show-poster">
+                        <img src="https://image.tmdb.org/t/p/w500/86zkkFCrNc4VeqvCANTmpGNgFEF.jpg" alt="Single's Inferno">
+                        <div class="show-overlay">
+                            <div class="play-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+                                    <polygon points="5,3 19,12 5,21"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="show-title">Single's Inferno</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ SCREEN 3: GENERATING ============ -->
+    <div id="generate-screen" class="screen">
+        <nav class="navbar">
+            <div class="logo">SORA<span>SHORTS</span></div>
+        </nav>
+        <div class="generate-container">
+            <h2 class="storyboard-heading" id="storyboard-heading">Your Storyboard</h2>
+            <div class="storyboard" id="storyboard">
+                <div class="storyboard-scene" data-scene="1">
+                    <div class="scene-card">
+                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
+                        <img class="scene-image" alt="Scene 1">
+                    </div>
+                    <span class="scene-label">Scene 1</span>
+                </div>
+                <div class="storyboard-scene" data-scene="2">
+                    <div class="scene-card">
+                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
+                        <img class="scene-image" alt="Scene 2">
+                    </div>
+                    <span class="scene-label">Scene 2</span>
+                </div>
+                <div class="storyboard-scene" data-scene="3">
+                    <div class="scene-card">
+                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
+                        <img class="scene-image" alt="Scene 3">
+                    </div>
+                    <span class="scene-label">Scene 3</span>
+                </div>
+                <div class="storyboard-scene" data-scene="4">
+                    <div class="scene-card">
+                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
+                        <img class="scene-image" alt="Scene 4">
+                    </div>
+                    <span class="scene-label">Scene 4</span>
+                </div>
+                <div class="storyboard-scene" data-scene="5">
+                    <div class="scene-card">
+                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
+                        <img class="scene-image" alt="Scene 5">
+                    </div>
+                    <span class="scene-label">Scene 5</span>
+                </div>
+            </div>
+            <div class="generate-status" id="generate-status">
+                <div class="status-bar">
+                    <div class="status-dot pulse"></div>
+                    <span id="status-text">Generating your drama...</span>
+                </div>
+                <p class="status-detail" id="status-detail">Casting you into the scene</p>
+            </div>
+            <button class="btn btn-primary btn-generate-drama" id="generate-drama-btn" style="display:none">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/>
+                </svg>
+                Generate Drama
+            </button>
+        </div>
+    </div>
+
+    <!-- ============ SCREEN 4: RESULT ============ -->
+    <div id="result-screen" class="screen">
+        <nav class="navbar">
+            <div class="logo">SORA<span>SHORTS</span></div>
+        </nav>
+        <div class="result-container">
+            <h2 class="result-heading">Your Drama is Ready</h2>
+            <div class="video-wrapper">
+                <video id="result-video" controls playsinline autoplay loop></video>
+            </div>
+            <div class="result-actions">
+                <button class="btn btn-primary" id="save-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7,10 12,15 17,10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Save Video
+                </button>
+                <button class="btn btn-secondary" id="tryagain-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="1,4 1,10 7,10"/>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                    </svg>
+                    Try Another
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ ERROR OVERLAY ============ -->
+    <div id="error-overlay" class="overlay" style="display:none">
+        <div class="error-modal">
+            <h3>Something went wrong</h3>
+            <p id="error-message"></p>
+            <button class="btn btn-primary" id="error-close-btn">Try Again</button>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

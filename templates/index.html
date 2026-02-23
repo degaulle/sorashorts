@@ -31,7 +31,6 @@
                 <p class="upload-text">Drop your photo here or click to upload</p>
                 <p class="upload-hint">or take a selfie with your camera</p>
                 <input type="file" id="file-input" accept="image/*" hidden>
-                <input type="file" id="camera-input" accept="image/*" capture="user" hidden>
                 <div class="upload-buttons">
                     <button class="btn btn-primary" id="upload-btn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -47,6 +46,20 @@
                             <circle cx="12" cy="13" r="4"/>
                         </svg>
                         Take Selfie
+                    </button>
+                </div>
+            </div>
+            <!-- Camera Viewfinder -->
+            <div class="camera-container" id="camera-container" style="display:none">
+                <video id="camera-video" autoplay playsinline muted></video>
+                <div class="camera-actions">
+                    <button class="btn btn-secondary" id="camera-cancel-btn">Cancel</button>
+                    <button class="btn btn-primary" id="camera-capture-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="4" fill="currentColor"/>
+                        </svg>
+                        Capture
                     </button>
                 </div>
             </div>

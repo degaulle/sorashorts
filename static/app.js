@@ -16,10 +16,13 @@ const screens = {
 
 const els = {
     fileInput: document.getElementById("file-input"),
-    cameraInput: document.getElementById("camera-input"),
     uploadArea: document.getElementById("upload-area"),
     uploadBtn: document.getElementById("upload-btn"),
     cameraBtn: document.getElementById("camera-btn"),
+    cameraContainer: document.getElementById("camera-container"),
+    cameraVideo: document.getElementById("camera-video"),
+    cameraCaptureBtn: document.getElementById("camera-capture-btn"),
+    cameraCancelBtn: document.getElementById("camera-cancel-btn"),
     previewContainer: document.getElementById("preview-container"),
     photoPreview: document.getElementById("photo-preview"),
     retakeBtn: document.getElementById("retake-btn"),
@@ -107,9 +110,55 @@ els.uploadBtn.addEventListener("click", (e) => {
     els.fileInput.click();
 });
 
-els.cameraBtn.addEventListener("click", (e) => {
+// ===== LIVE CAMERA =====
+let cameraStream = null;
+
+function stopCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach((t) => t.stop());
+        cameraStream = null;
+    }
+    els.cameraVideo.srcObject = null;
+}
+
+els.cameraBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
-    els.cameraInput.click();
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false,
+        });
+        els.cameraVideo.srcObject = cameraStream;
+        els.uploadArea.style.display = "none";
+        els.cameraContainer.style.display = "block";
+    } catch {
+        showError("Could not access camera. Please allow camera permissions or upload a photo instead.");
+    }
+});
+
+els.cameraCaptureBtn.addEventListener("click", async () => {
+    const video = els.cameraVideo;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    // Mirror the capture to match the viewfinder
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    stopCamera();
+    els.cameraContainer.style.display = "none";
+
+    const dataURI = canvas.toDataURL("image/jpeg", 0.9);
+    userPhotoDataURI = await compressImage(dataURI, 800, 0.8);
+    els.photoPreview.src = userPhotoDataURI;
+    els.previewContainer.style.display = "block";
+});
+
+els.cameraCancelBtn.addEventListener("click", () => {
+    stopCamera();
+    els.cameraContainer.style.display = "none";
+    els.uploadArea.style.display = "block";
 });
 
 els.uploadArea.addEventListener("click", () => {
@@ -117,10 +166,6 @@ els.uploadArea.addEventListener("click", () => {
 });
 
 els.fileInput.addEventListener("change", (e) => {
-    if (e.target.files[0]) handleFile(e.target.files[0]);
-});
-
-els.cameraInput.addEventListener("change", (e) => {
     if (e.target.files[0]) handleFile(e.target.files[0]);
 });
 
@@ -147,7 +192,6 @@ els.retakeBtn.addEventListener("click", () => {
     els.previewContainer.style.display = "none";
     els.uploadArea.style.display = "block";
     els.fileInput.value = "";
-    els.cameraInput.value = "";
 });
 
 els.continueBtn.addEventListener("click", async () => {

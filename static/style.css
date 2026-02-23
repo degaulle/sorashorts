@@ -204,6 +204,28 @@ html, body {
     justify-content: center;
 }
 
+/* Camera Viewfinder */
+.camera-container {
+    text-align: center;
+    max-width: 320px;
+}
+
+.camera-container video {
+    width: 100%;
+    max-height: 400px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    margin-bottom: 20px;
+    transform: scaleX(-1);
+}
+
+.camera-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
 /* Preview */
 .preview-container {
     text-align: center;

@@ -60,7 +60,6 @@ function showError(message) {
 
 els.errorCloseBtn.addEventListener("click", () => {
     els.errorOverlay.style.display = "none";
-    showScreen("select");
 });
 
 // ===== PHOTO UPLOAD =====
@@ -365,6 +364,11 @@ async function startGeneration() {
         els.generateDramaBtn.style.display = "";
     } catch (error) {
         console.error("Generation error:", error);
+        els.generateStatus.style.display = "none";
+        // If some images were generated, still allow generating drama with them
+        if (generatedImages.length > 0) {
+            els.generateDramaBtn.style.display = "";
+        }
         showError(error.message || "Something went wrong during generation");
     }
 }

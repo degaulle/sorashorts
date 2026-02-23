@@ -165,22 +165,26 @@ def generate_image():
         "num_images": 1,
     }
 
-    response = requests.post(
-        "https://fal.run/fal-ai/nano-banana/edit",
-        headers={
-            "Authorization": f"Key {FAL_KEY}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=120,
-    )
+    try:
+        response = requests.post(
+            "https://fal.run/fal-ai/nano-banana/edit",
+            headers={
+                "Authorization": f"Key {FAL_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=120,
+        )
 
-    log.info(f"[GENERATE-IMAGE] Scene {scene_number} response: {response.status_code}")
+        log.info(f"[GENERATE-IMAGE] Scene {scene_number} response: {response.status_code}")
 
-    if response.status_code != 200:
-        return jsonify({"error": response.text}), response.status_code
+        if response.status_code != 200:
+            return jsonify({"error": response.text}), response.status_code
 
-    return jsonify(response.json())
+        return jsonify(response.json())
+    except Exception as e:
+        log.error(f"[GENERATE-IMAGE] Scene {scene_number} exception: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/generate-scene-prompt", methods=["POST"])

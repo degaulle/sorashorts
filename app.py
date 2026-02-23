@@ -38,7 +38,7 @@ def detect_gender():
 
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=10,
         messages=[
             {
@@ -91,7 +91,7 @@ def generate_storyboard():
 
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=1500,
         messages=[
             {
@@ -102,16 +102,18 @@ def generate_storyboard():
                     f"A reference photo of the user will be provided to the image generator.\n\n"
                     f"Create a 5-scene storyboard that tells a consistent, compelling mini-plot "
                     f"inspired by '{show_name}'. Each scene should build on the previous one.\n\n"
-                    f"IMPORTANT: In every scene prompt, refer to the {gender} lead as '{person_ref}' "
-                    f"or '{person_ref_alt}'. Describe {pronoun_pos} actions, pose, and expression, "
-                    f"but do NOT describe {pronoun_pos} physical appearance (hair color, skin tone, etc.) since "
-                    f"{pronoun_pos} look comes from the reference photo. You may describe the other characters normally.\n\n"
-                    f"For each scene, write an image generation prompt (2-3 sentences) describing:\n"
-                    f"- The visual composition and setting\n"
-                    f"- The {gender} lead's (from reference photo) action, pose, and expression\n"
-                    f"- Other characters and their appearance\n"
-                    f"- Cinematic lighting, mood, and camera angle\n"
-                    f"- Keep it in 9:16 portrait format\n\n"
+                    f"CRITICAL CONSISTENCY RULES:\n"
+                    f"1. In every scene, refer to the {gender} lead as '{person_ref}' or '{person_ref_alt}'. "
+                    f"Do NOT describe {pronoun_pos} physical appearance since it comes from the reference photo.\n"
+                    f"2. For EVERY other character, define their EXACT appearance in Scene 1 "
+                    f"(age, ethnicity, hair style/color/length, outfit, distinguishing features). "
+                    f"Then COPY that exact same description word-for-word in Scenes 2-5. "
+                    f"This is critical for visual consistency.\n"
+                    f"3. Use the SAME lighting style across all 5 scenes (e.g., warm golden-hour, cool blue-toned, etc.).\n"
+                    f"4. Every prompt MUST start with: 'Cinematic film still, 35mm lens, shallow depth of field. '\n\n"
+                    f"For each scene, write an image generation prompt (2-3 sentences) with:\n"
+                    f"- Character identity details FIRST, then pose/expression, then setting\n"
+                    f"- 9:16 portrait format\n\n"
                     f"Return ONLY a JSON array of 5 objects, each with 'scene_number' (1-5) and 'prompt'. "
                     f"No markdown, no explanation, just the JSON array."
                 ),
@@ -139,6 +141,7 @@ def generate_image():
     prompt = data["prompt"]  # scene prompt from storyboard
     scene_number = data.get("scene_number", 1)
     gender = data.get("gender", "male")
+    ref_image = data.get("ref_image")  # URL of scene 1 image for consistency
 
     # Prepend instruction to use the reference photo's face for the lead character
     if gender == "female":
@@ -153,11 +156,16 @@ def generate_image():
         f"Place them into this scene: {prompt}"
     )
 
-    log.info(f"[GENERATE-IMAGE] Scene {scene_number}, prompt: {full_prompt[:150]}...")
+    log.info(f"[GENERATE-IMAGE] Scene {scene_number}, ref_image: {'yes' if ref_image else 'no'}, prompt: {full_prompt[:120]}...")
+
+    # Build reference image list: user photo + optional scene 1 image for consistency
+    image_refs = [user_photo]
+    if ref_image:
+        image_refs.append(ref_image)
 
     payload = {
         "prompt": full_prompt,
-        "image_urls": [user_photo],
+        "image_urls": image_refs,
         "aspect_ratio": "9:16",
         "output_format": "jpeg",
         "num_images": 1,
@@ -188,7 +196,7 @@ def generate_scene_prompt():
 
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=300,
         messages=[
             {

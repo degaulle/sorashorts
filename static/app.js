@@ -1,5 +1,6 @@
 // ===== STATE =====
 let userPhotoDataURI = null;
+let detectedGender = null;
 let selectedShow = null;
 let generatedImages = []; // array of image URLs for 5 scenes
 let scenePrompts = []; // array of scene prompt texts
@@ -124,8 +125,33 @@ els.retakeBtn.addEventListener("click", () => {
     els.cameraInput.value = "";
 });
 
-els.continueBtn.addEventListener("click", () => {
+els.continueBtn.addEventListener("click", async () => {
     if (!userPhotoDataURI) return;
+
+    // Detect gender from photo
+    const origText = els.continueBtn.textContent;
+    els.continueBtn.textContent = "Analyzing...";
+    els.continueBtn.disabled = true;
+
+    try {
+        const resp = await fetch("/api/detect-gender", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ photo: userPhotoDataURI }),
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            detectedGender = data.gender;
+            console.log("Detected gender:", detectedGender);
+        } else {
+            detectedGender = "male"; // fallback
+        }
+    } catch {
+        detectedGender = "male"; // fallback
+    }
+
+    els.continueBtn.textContent = origText;
+    els.continueBtn.disabled = false;
     els.navPhoto.style.backgroundImage = `url(${userPhotoDataURI})`;
     showScreen("select");
 });
@@ -241,7 +267,7 @@ async function startGeneration() {
         const storyboardResponse = await fetch("/api/generate-storyboard", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ show_name: selectedShow }),
+            body: JSON.stringify({ show_name: selectedShow, gender: detectedGender }),
         });
 
         if (!storyboardResponse.ok) {
@@ -272,6 +298,7 @@ async function startGeneration() {
                     prompt: scene.prompt,
                     show_name: selectedShow,
                     scene_number: sceneNum,
+                    gender: detectedGender,
                 }),
             });
 
@@ -450,6 +477,7 @@ els.tryagainBtn.addEventListener("click", () => {
     videoURL = null;
     generatedImages = [];
     scenePrompts = [];
+    detectedGender = null;
     selectedShow = null;
     els.resultVideo.src = "";
     els.customShowInput.value = "";

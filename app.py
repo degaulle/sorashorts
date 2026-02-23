@@ -26,10 +26,68 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/api/detect-gender", methods=["POST"])
+def detect_gender():
+    data = request.json
+    photo = data["photo"]  # base64 data URI
+
+    # Parse the data URI to extract media type and base64 data
+    # Format: data:image/jpeg;base64,/9j/4AAQ...
+    header, b64_data = photo.split(",", 1)
+    media_type = header.split(":")[1].split(";")[0]
+
+    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    message = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=10,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": b64_data,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": "Is the person in this photo male or female? Reply with only one word: male or female",
+                    },
+                ],
+            }
+        ],
+    )
+
+    gender = message.content[0].text.strip().lower()
+    # Normalize to "male" or "female"
+    if "female" in gender or "woman" in gender:
+        gender = "female"
+    else:
+        gender = "male"
+
+    log.info(f"[DETECT-GENDER] Detected: {gender}")
+    return jsonify({"gender": gender})
+
+
 @app.route("/api/generate-storyboard", methods=["POST"])
 def generate_storyboard():
     data = request.json
     show_name = data["show_name"]
+    gender = data.get("gender", "male")
+
+    if gender == "female":
+        gender_upper = "FEMALE"
+        person_ref = "the woman from the reference photo"
+        person_ref_alt = "the woman in the reference image"
+        pronoun_pos = "her"
+    else:
+        gender_upper = "MALE"
+        person_ref = "the man from the reference photo"
+        person_ref_alt = "the man in the reference image"
+        pronoun_pos = "his"
 
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
@@ -40,17 +98,17 @@ def generate_storyboard():
                 "role": "user",
                 "content": (
                     f"You are a storyboard artist for a short drama fan fiction of '{show_name}'. "
-                    f"The user will be cast as the MALE lead/love interest character in the story. "
+                    f"The user will be cast as the {gender_upper} lead/love interest character in the story. "
                     f"A reference photo of the user will be provided to the image generator.\n\n"
                     f"Create a 5-scene storyboard that tells a consistent, compelling mini-plot "
                     f"inspired by '{show_name}'. Each scene should build on the previous one.\n\n"
-                    f"IMPORTANT: In every scene prompt, refer to the male lead as 'the man from the reference photo' "
-                    f"or 'the man in the reference image'. Describe his actions, pose, and expression, "
-                    f"but do NOT describe his physical appearance (hair color, skin tone, etc.) since "
-                    f"his look comes from the reference photo. You may describe the other characters normally.\n\n"
+                    f"IMPORTANT: In every scene prompt, refer to the {gender} lead as '{person_ref}' "
+                    f"or '{person_ref_alt}'. Describe {pronoun_pos} actions, pose, and expression, "
+                    f"but do NOT describe {pronoun_pos} physical appearance (hair color, skin tone, etc.) since "
+                    f"{pronoun_pos} look comes from the reference photo. You may describe the other characters normally.\n\n"
                     f"For each scene, write an image generation prompt (2-3 sentences) describing:\n"
                     f"- The visual composition and setting\n"
-                    f"- The male lead's (from reference photo) action, pose, and expression\n"
+                    f"- The {gender} lead's (from reference photo) action, pose, and expression\n"
                     f"- Other characters and their appearance\n"
                     f"- Cinematic lighting, mood, and camera angle\n"
                     f"- Keep it in 9:16 portrait format\n\n"
@@ -80,12 +138,19 @@ def generate_image():
     user_photo = data["photo"]  # base64 data URI
     prompt = data["prompt"]  # scene prompt from storyboard
     scene_number = data.get("scene_number", 1)
+    gender = data.get("gender", "male")
 
-    # Prepend instruction to use the reference photo's face for the male lead
+    # Prepend instruction to use the reference photo's face for the lead character
+    if gender == "female":
+        role_desc = "female lead character"
+        pronoun_obj = "her"
+    else:
+        role_desc = "male lead character"
+        pronoun_obj = "his"
     full_prompt = (
-        f"Use the face and appearance of the person in the reference image as the male lead character. "
-        f"Keep his face, identity, and features exactly as shown in the reference photo. "
-        f"Place him into this scene: {prompt}"
+        f"Use the face and appearance of the person in the reference image as the {role_desc}. "
+        f"Keep {pronoun_obj} face, identity, and features exactly as shown in the reference photo. "
+        f"Place them into this scene: {prompt}"
     )
 
     log.info(f"[GENERATE-IMAGE] Scene {scene_number}, prompt: {full_prompt[:150]}...")

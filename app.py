@@ -141,7 +141,6 @@ def generate_image():
     prompt = data["prompt"]  # scene prompt from storyboard
     scene_number = data.get("scene_number", 1)
     gender = data.get("gender", "male")
-    ref_image = data.get("ref_image")  # URL of scene 1 image for consistency
 
     # Prepend instruction to use the reference photo's face for the lead character
     if gender == "female":
@@ -156,16 +155,11 @@ def generate_image():
         f"Place them into this scene: {prompt}"
     )
 
-    log.info(f"[GENERATE-IMAGE] Scene {scene_number}, ref_image: {'yes' if ref_image else 'no'}, prompt: {full_prompt[:120]}...")
-
-    # Build reference image list: user photo + optional scene 1 image for consistency
-    image_refs = [user_photo]
-    if ref_image:
-        image_refs.append(ref_image)
+    log.info(f"[GENERATE-IMAGE] Scene {scene_number}, prompt: {full_prompt[:150]}...")
 
     payload = {
         "prompt": full_prompt,
-        "image_urls": image_refs,
+        "image_urls": [user_photo],
         "aspect_ratio": "9:16",
         "output_format": "jpeg",
         "num_images": 1,

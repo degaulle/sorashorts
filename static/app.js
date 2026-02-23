@@ -290,22 +290,16 @@ async function startGeneration() {
             els.statusText.textContent = `Generating scene ${sceneNum} of ${scenes.length}...`;
             els.statusDetail.textContent = scene.prompt;
 
-            // For scenes 2-5, pass first scene's image as reference for consistency
-            const payload = {
-                photo: userPhotoDataURI,
-                prompt: scene.prompt,
-                show_name: selectedShow,
-                scene_number: sceneNum,
-                gender: detectedGender,
-            };
-            if (i > 0 && generatedImages.length > 0) {
-                payload.ref_image = generatedImages[0];
-            }
-
             const imageResponse = await fetch("/api/generate-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({
+                    photo: userPhotoDataURI,
+                    prompt: scene.prompt,
+                    show_name: selectedShow,
+                    scene_number: sceneNum,
+                    gender: detectedGender,
+                }),
             });
 
             if (!imageResponse.ok) {

@@ -64,12 +64,38 @@ els.errorCloseBtn.addEventListener("click", () => {
 });
 
 // ===== PHOTO UPLOAD =====
+function compressImage(dataURI, maxSize, quality) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            let w = img.width;
+            let h = img.height;
+            if (w > maxSize || h > maxSize) {
+                if (w > h) {
+                    h = Math.round((h * maxSize) / w);
+                    w = maxSize;
+                } else {
+                    w = Math.round((w * maxSize) / h);
+                    h = maxSize;
+                }
+            }
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = dataURI;
+    });
+}
+
 function handleFile(file) {
     if (!file || !file.type.startsWith("image/")) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
-        userPhotoDataURI = e.target.result;
+    reader.onload = async (e) => {
+        // Compress to max 800px, 80% JPEG quality to keep payload small
+        userPhotoDataURI = await compressImage(e.target.result, 800, 0.8);
         els.photoPreview.src = userPhotoDataURI;
         els.uploadArea.style.display = "none";
         els.previewContainer.style.display = "block";
@@ -303,13 +329,22 @@ async function startGeneration() {
             });
 
             if (!imageResponse.ok) {
-                const err = await imageResponse.json();
-                throw new Error(
-                    err.error || `Failed to generate scene ${sceneNum}`
-                );
+                let errMsg = `Failed to generate scene ${sceneNum}`;
+                try {
+                    const err = await imageResponse.json();
+                    errMsg = err.error || errMsg;
+                } catch {
+                    errMsg += ` (server returned ${imageResponse.status})`;
+                }
+                throw new Error(errMsg);
             }
 
-            const imageData = await imageResponse.json();
+            let imageData;
+            try {
+                imageData = await imageResponse.json();
+            } catch {
+                throw new Error(`Invalid response for scene ${sceneNum}`);
+            }
             const imageURL = extractImageURL(imageData);
 
             if (!imageURL) {

@@ -40,11 +40,18 @@ def generate_storyboard():
                 "role": "user",
                 "content": (
                     f"You are a storyboard artist for a short drama fan fiction of '{show_name}'. "
+                    f"The user will be cast as the MALE lead/love interest character in the story. "
+                    f"A reference photo of the user will be provided to the image generator.\n\n"
                     f"Create a 5-scene storyboard that tells a consistent, compelling mini-plot "
                     f"inspired by '{show_name}'. Each scene should build on the previous one.\n\n"
+                    f"IMPORTANT: In every scene prompt, refer to the male lead as 'the man from the reference photo' "
+                    f"or 'the man in the reference image'. Describe his actions, pose, and expression, "
+                    f"but do NOT describe his physical appearance (hair color, skin tone, etc.) since "
+                    f"his look comes from the reference photo. You may describe the other characters normally.\n\n"
                     f"For each scene, write an image generation prompt (2-3 sentences) describing:\n"
                     f"- The visual composition and setting\n"
-                    f"- The protagonist's action, pose, and expression\n"
+                    f"- The male lead's (from reference photo) action, pose, and expression\n"
+                    f"- Other characters and their appearance\n"
                     f"- Cinematic lighting, mood, and camera angle\n"
                     f"- Keep it in 9:16 portrait format\n\n"
                     f"Return ONLY a JSON array of 5 objects, each with 'scene_number' (1-5) and 'prompt'. "
@@ -74,10 +81,11 @@ def generate_image():
     prompt = data["prompt"]  # scene prompt from storyboard
     scene_number = data.get("scene_number", 1)
 
-    # Prepend instruction to use the reference photo for every scene
+    # Prepend instruction to use the reference photo's face for the male lead
     full_prompt = (
-        f"Using the person from the reference image as the protagonist, "
-        f"put them into this scene: {prompt}"
+        f"Use the face and appearance of the person in the reference image as the male lead character. "
+        f"Keep his face, identity, and features exactly as shown in the reference photo. "
+        f"Place him into this scene: {prompt}"
     )
 
     log.info(f"[GENERATE-IMAGE] Scene {scene_number}, prompt: {full_prompt[:150]}...")
@@ -154,6 +162,8 @@ def generate_video():
         },
     )
 
+    log.info(f"[GENERATE-VIDEO] Queue submission response ({response.status_code}): {response.text[:500]}")
+
     if response.status_code != 200:
         return jsonify({"error": response.text}), response.status_code
 
@@ -163,7 +173,7 @@ def generate_video():
 @app.route("/api/video-status/<request_id>")
 def video_status(request_id):
     response = requests.get(
-        f"https://queue.fal.run/fal-ai/kling-video/v2.5-turbo/pro/image-to-video/requests/{request_id}/status",
+        f"https://queue.fal.run/fal-ai/kling-video/requests/{request_id}/status",
         headers={"Authorization": f"Key {FAL_KEY}"},
     )
     log.info(f"[VIDEO-STATUS] raw response ({response.status_code}): {response.text[:300]}")
@@ -176,7 +186,7 @@ def video_status(request_id):
 @app.route("/api/video-result/<request_id>")
 def video_result(request_id):
     response = requests.get(
-        f"https://queue.fal.run/fal-ai/kling-video/v2.5-turbo/pro/image-to-video/requests/{request_id}",
+        f"https://queue.fal.run/fal-ai/kling-video/requests/{request_id}",
         headers={"Authorization": f"Key {FAL_KEY}"},
     )
     log.info(f"[VIDEO-RESULT] raw response ({response.status_code}): {response.text[:500]}")

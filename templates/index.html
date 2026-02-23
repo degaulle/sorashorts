@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SoraShorts - Star in Your Own Drama</title>
+    <title>SoraShorts - Every Second Is Your Drama</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,8 +17,9 @@
         </nav>
         <div class="upload-container">
             <div class="upload-hero">
-                <h1>Star in Your Own Drama</h1>
-                <p class="subtitle">Upload a photo and we'll cast you as the lead in an iconic show</p>
+                <p class="hero-tagline">Every Second Is Your Drama</p>
+                <h1>YOU Are the<br>Main Character</h1>
+                <p class="subtitle">Let everyone be the protagonist of their own dream.</p>
             </div>
             <div class="upload-area" id="upload-area">
                 <div class="upload-icon">
@@ -68,6 +69,10 @@
         </nav>
         <div class="select-container">
             <h2 class="select-heading">What drama do you see yourself in?</h2>
+            <div class="custom-show-input">
+                <input type="text" id="custom-show" placeholder="Or type any show name..." autocomplete="off">
+                <button class="btn btn-primary" id="custom-show-btn">Go</button>
+            </div>
             <div class="shows-grid">
                 <div class="show-card" data-show="Fifty Shades of Grey">
                     <div class="show-poster">
@@ -190,6 +195,7 @@
                         <div class="scene-placeholder"><div class="spinner-small"></div></div>
                         <img class="scene-image" alt="Scene 1">
                     </div>
+                    <div class="scene-tooltip"></div>
                     <span class="scene-label">Scene 1</span>
                 </div>
                 <div class="storyboard-scene" data-scene="2">
@@ -197,6 +203,7 @@
                         <div class="scene-placeholder"><div class="spinner-small"></div></div>
                         <img class="scene-image" alt="Scene 2">
                     </div>
+                    <div class="scene-tooltip"></div>
                     <span class="scene-label">Scene 2</span>
                 </div>
                 <div class="storyboard-scene" data-scene="3">
@@ -204,6 +211,7 @@
                         <div class="scene-placeholder"><div class="spinner-small"></div></div>
                         <img class="scene-image" alt="Scene 3">
                     </div>
+                    <div class="scene-tooltip"></div>
                     <span class="scene-label">Scene 3</span>
                 </div>
                 <div class="storyboard-scene" data-scene="4">
@@ -211,6 +219,7 @@
                         <div class="scene-placeholder"><div class="spinner-small"></div></div>
                         <img class="scene-image" alt="Scene 4">
                     </div>
+                    <div class="scene-tooltip"></div>
                     <span class="scene-label">Scene 4</span>
                 </div>
                 <div class="storyboard-scene" data-scene="5">
@@ -218,6 +227,7 @@
                         <div class="scene-placeholder"><div class="spinner-small"></div></div>
                         <img class="scene-image" alt="Scene 5">
                     </div>
+                    <div class="scene-tooltip"></div>
                     <span class="scene-label">Scene 5</span>
                 </div>
             </div>
@@ -264,6 +274,15 @@
                     Try Another
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- ============ LIGHTBOX OVERLAY ============ -->
+    <div id="lightbox-overlay" class="overlay" style="display:none">
+        <div class="lightbox-content">
+            <img id="lightbox-image" alt="Enlarged scene">
+            <p class="lightbox-caption" id="lightbox-caption"></p>
+            <button class="lightbox-close" id="lightbox-close">&times;</button>
         </div>
     </div>
 

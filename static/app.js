@@ -2,6 +2,7 @@
 let userPhotoDataURI = null;
 let selectedShow = null;
 let generatedImages = []; // array of image URLs for 5 scenes
+let scenePrompts = []; // array of scene prompt texts
 let videoURL = null;
 
 // ===== DOM REFS =====
@@ -23,6 +24,8 @@ const els = {
     retakeBtn: document.getElementById("retake-btn"),
     continueBtn: document.getElementById("continue-btn"),
     navPhoto: document.getElementById("nav-photo"),
+    customShowInput: document.getElementById("custom-show"),
+    customShowBtn: document.getElementById("custom-show-btn"),
     storyboard: document.getElementById("storyboard"),
     storyboardHeading: document.getElementById("storyboard-heading"),
     generateStatus: document.getElementById("generate-status"),
@@ -32,6 +35,10 @@ const els = {
     resultVideo: document.getElementById("result-video"),
     saveBtn: document.getElementById("save-btn"),
     tryagainBtn: document.getElementById("tryagain-btn"),
+    lightboxOverlay: document.getElementById("lightbox-overlay"),
+    lightboxImage: document.getElementById("lightbox-image"),
+    lightboxCaption: document.getElementById("lightbox-caption"),
+    lightboxClose: document.getElementById("lightbox-close"),
     errorOverlay: document.getElementById("error-overlay"),
     errorMessage: document.getElementById("error-message"),
     errorCloseBtn: document.getElementById("error-close-btn"),
@@ -124,11 +131,46 @@ els.continueBtn.addEventListener("click", () => {
 });
 
 // ===== SHOW SELECTION =====
+// Clicking a show card
 document.querySelectorAll(".show-card").forEach((card) => {
     card.addEventListener("click", () => {
         selectedShow = card.dataset.show;
         startGeneration();
     });
+});
+
+// Custom show input
+els.customShowBtn.addEventListener("click", () => {
+    const val = els.customShowInput.value.trim();
+    if (!val) return;
+    selectedShow = val;
+    startGeneration();
+});
+
+els.customShowInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        const val = els.customShowInput.value.trim();
+        if (!val) return;
+        selectedShow = val;
+        startGeneration();
+    }
+});
+
+// ===== LIGHTBOX =====
+function openLightbox(imageURL, caption) {
+    els.lightboxImage.src = imageURL;
+    els.lightboxCaption.textContent = caption || "";
+    els.lightboxOverlay.style.display = "flex";
+}
+
+function closeLightbox() {
+    els.lightboxOverlay.style.display = "none";
+    els.lightboxImage.src = "";
+}
+
+els.lightboxClose.addEventListener("click", closeLightbox);
+els.lightboxOverlay.addEventListener("click", (e) => {
+    if (e.target === els.lightboxOverlay) closeLightbox();
 });
 
 // ===== HELPER: extract image URL from fal.ai response =====
@@ -146,17 +188,21 @@ function extractImageURL(imageData) {
 // ===== STORYBOARD GENERATION =====
 function resetStoryboard() {
     generatedImages = [];
+    scenePrompts = [];
     const scenes = els.storyboard.querySelectorAll(".storyboard-scene");
     scenes.forEach((scene) => {
         const img = scene.querySelector(".scene-image");
         const placeholder = scene.querySelector(".scene-placeholder");
+        const tooltip = scene.querySelector(".scene-tooltip");
         img.classList.remove("visible");
         img.src = "";
+        img.onclick = null;
         placeholder.classList.remove("hidden");
+        if (tooltip) tooltip.textContent = "";
     });
 }
 
-function showSceneImage(sceneNumber, imageURL) {
+function showSceneImage(sceneNumber, imageURL, promptText) {
     const scene = els.storyboard.querySelector(
         `.storyboard-scene[data-scene="${sceneNumber}"]`
     );
@@ -164,11 +210,20 @@ function showSceneImage(sceneNumber, imageURL) {
 
     const img = scene.querySelector(".scene-image");
     const placeholder = scene.querySelector(".scene-placeholder");
+    const tooltip = scene.querySelector(".scene-tooltip");
+
+    // Set tooltip text (hover description)
+    tooltip.textContent = promptText || "";
 
     img.src = imageURL;
     img.onload = () => {
         placeholder.classList.add("hidden");
         img.classList.add("visible");
+    };
+
+    // Click to enlarge
+    img.onclick = () => {
+        openLightbox(imageURL, promptText);
     };
 }
 
@@ -207,7 +262,7 @@ async function startGeneration() {
             const sceneNum = scene.scene_number || i + 1;
 
             els.statusText.textContent = `Generating scene ${sceneNum} of ${scenes.length}...`;
-            els.statusDetail.textContent = scene.prompt.substring(0, 80) + "...";
+            els.statusDetail.textContent = scene.prompt;
 
             const imageResponse = await fetch("/api/generate-image", {
                 method: "POST",
@@ -239,7 +294,8 @@ async function startGeneration() {
             }
 
             generatedImages.push(imageURL);
-            showSceneImage(sceneNum, imageURL);
+            scenePrompts.push(scene.prompt);
+            showSceneImage(sceneNum, imageURL, scene.prompt);
         }
 
         // All scenes generated — show Generate Drama button
@@ -393,7 +449,9 @@ els.saveBtn.addEventListener("click", async () => {
 els.tryagainBtn.addEventListener("click", () => {
     videoURL = null;
     generatedImages = [];
+    scenePrompts = [];
     selectedShow = null;
     els.resultVideo.src = "";
+    els.customShowInput.value = "";
     showScreen("select");
 });

@@ -1,0 +1,167 @@
+===========================================================================
+SORASHORTS PROMPT PIPELINE EXAMPLES
+===========================================================================
+
+There are 2 stages:
+  1. Haiku 4.5 generates 5 scene prompts (storyboard)
+  2. Each scene prompt gets a prefix prepended before sending to nano-banana/edit
+
+The prefix (prepended by app.py for EVERY scene):
+  "Use the face and appearance of the person in the reference image as the
+   male lead character. Keep his face, identity, and features exactly as
+   shown in the reference photo. Place them into this scene: {scene_prompt}"
+
+For female users, "male lead" → "female lead", "his" → "her".
+
+===========================================================================
+EXAMPLE 1: Crazy Rich Asians (male user)
+===========================================================================
+
+--- Scene 1: What Haiku generates ---
+A luxury airport terminal with marble floors and contemporary architecture.
+The man from the reference photo stands frozen mid-stride, his expression
+shifting from confidence to surprise as he locks eyes with Rachel across
+the crowded departure lounge. Rachel, an elegant East Asian woman in a
+cream blazer, walks toward him with determined steps, her designer luggage
+trailing behind. Warm golden afternoon light streams through floor-to-ceiling
+windows, casting soft shadows across their faces. Shot from a low angle
+emphasizing the dramatic moment of recognition. 9:16 portrait orientation.
+
+--- Scene 1: What actually gets sent to nano-banana/edit ---
+Use the face and appearance of the person in the reference image as the
+male lead character. Keep his face, identity, and features exactly as
+shown in the reference photo. Place them into this scene: A luxury airport
+terminal with marble floors and contemporary architecture. The man from the
+reference photo stands frozen mid-stride, his expression shifting from
+confidence to surprise as he locks eyes with Rachel across the crowded
+departure lounge. Rachel, an elegant East Asian woman in a cream blazer,
+walks toward him with determined steps, her designer luggage trailing behind.
+Warm golden afternoon light streams through floor-to-ceiling windows, casting
+soft shadows across their faces. Shot from a low angle emphasizing the
+dramatic moment of recognition. 9:16 portrait orientation.
+
+--- Scene 2 ---
+An opulent dining room in a colonial mansion with crystal chandeliers and
+mahogany walls. The man from the reference photo sits rigidly at the head
+of a long dinner table, his jaw clenched and eyes intense as his grandmother,
+an elderly matriarch in traditional jade jewelry, points an accusatory finger
+at him across the table. Rachel sits beside him, her face etched with concern.
+Candlelight flickers across their faces, creating dramatic shadows. Tight
+framing captures the tension from a side angle. 9:16 portrait orientation.
+
+--- Scene 3 ---
+A modern penthouse rooftop overlooking Singapore's glittering skyline at dusk.
+The man from the reference photo leans against the glass railing, shoulders
+slightly hunched, his expression softened with vulnerability and regret as he
+gazes at the city lights below. Rachel stands a few feet away in an elegant
+evening gown, her silhouette backlit by the golden hour sky. The atmosphere is
+intimate and melancholic. Shot from a wide angle capturing both figures against
+the expansive cityscape. 9:16 portrait orientation.
+
+--- Scene 4 ---
+An exclusive yacht club's white marble pavilion decorated with white roses and
+silk drapery. The man from the reference photo stands center, his posture
+confident and open, one hand over his heart as he speaks passionately with raw
+emotion evident in his eyes and expression. Rachel stands before him in a white
+gown, her hand covering her mouth in shocked emotion. Soft string lights twinkle
+overhead against the twilight sky. Shot from a romantic medium distance capturing
+both faces and their emotional connection. 9:16 portrait orientation.
+
+--- Scene 5 ---
+A contemporary art gallery in downtown Singapore filled with natural light from
+massive windows. The man from the reference photo stands beside Rachel, his arm
+protectively around her waist, both looking forward with hope and determination
+in their expressions. His grandmother stands across the room with a knowing
+smile, finally accepting their union. The gallery walls showcase modern Asian art.
+Soft, even daylight creates a clean, hopeful atmosphere. Shot from a three-quarter
+angle showing all three figures in a moment of reconciliation and new promise.
+9:16 portrait orientation.
+
+
+===========================================================================
+EXAMPLE 2: Twilight (male user)
+===========================================================================
+
+--- Scene 1 ---
+A misty forest clearing at dusk, soft golden light filtering through tall
+evergreen trees. The man from the reference photo stands alone in the center,
+his expression contemplative and slightly troubled, shoulders tense as he gazes
+toward the darkening woods with an air of quiet loneliness. Fallen leaves scatter
+around his feet, and the atmosphere is hauntingly beautiful with cool, ethereal
+lighting. Shot from a low angle in 9:16 portrait format, cinematic and moody.
+
+--- Scene 2 ---
+A rainy small-town street at night outside a local diner, neon signs reflecting
+on wet pavement. The man from the reference photo leans against a brick wall, his
+face illuminated by soft neon light, expression surprised and captivated as he
+watches a beautiful pale-skinned woman with long dark hair walk past in a dark
+coat. Their eyes meet momentarily, creating an electric connection. Cinematic
+9:16 portrait composition with atmospheric rain and cool tones.
+
+--- Scene 3 ---
+Inside a moonlit high school classroom at night, desks arranged in shadows,
+silver moonlight streaming through large windows. The man from the reference
+photo sits at a desk, his posture leaning forward with intense focus and barely
+contained emotion, staring at the mysterious woman with pale skin and dark hair
+who sits across from him in the darkness. Their expressions reveal dangerous
+attraction and unspoken secrets. Intimate 9:16 portrait framing with cool blue
+moonlight.
+
+--- Scene 4 ---
+A dramatic cliff overlooking a vast forest valley at twilight, storm clouds
+gathering overhead with purple and amber light breaking through. The man from
+the reference photo stands at the cliff's edge, his body language defensive yet
+vulnerable, expression conflicted and pained as he faces the pale-skinned
+dark-haired woman who stands several feet away, her expression revealing her
+inhuman nature. The tension is palpable. Cinematic 9:16 wide shot with dramatic
+lighting and emotional depth.
+
+--- Scene 5 ---
+A secluded forest cabin interior lit by firelight and candlelight, warm amber
+glow casting dancing shadows on wooden walls. The man from the reference photo
+stands in the doorway, his expression softened and resolute, reaching toward the
+pale-skinned dark-haired woman who approaches him from across the room, both of
+them caught between love and danger. The intimacy is electric yet tinged with
+darkness. Close 9:16 portrait with warm, intimate cinematic lighting and romantic
+yet ominous mood.
+
+
+===========================================================================
+EXAMPLE 3: Bridgerton (male user)
+===========================================================================
+
+--- Scene 1 ---
+A grand Bridgerton-era ballroom with crystal chandeliers and ornate gold
+detailing. The man from the reference photo stands alone near a marble column,
+his posture stiff and formal in a tailored navy waistcoat, watching the crowd
+with a distant, guarded expression. Elegant couples dance in soft candlelit
+background blur. Shot in 9:16 portrait format with cool, moody lighting
+emphasizing his isolation.
+
+--- Scene 2 ---
+A sunlit garden gazebo during golden hour. The man from the reference image
+faces a beautiful young woman in a pale rose gown; his expression has softened
+with genuine interest as he extends his hand toward her. She smiles nervously.
+Ivy frames the scene, with soft dappled light creating romantic shadows. Close
+portrait shot in 9:16 capturing the moment of first connection.
+
+--- Scene 3 ---
+An intimate library setting with towering bookshelves and warm amber lamplight.
+The man in the reference photo sits across from the same woman, leaning forward
+with engaged intensity, his eyes tender and focused on her face as she speaks.
+His posture shows vulnerability and attention. Soft shadows and classical
+furnishings frame the scene in 9:16 portrait orientation.
+
+--- Scene 4 ---
+A tense drawing room with dramatic shadows cast by candlelight. The man from
+the reference photo stands with jaw clenched, one hand gripping his coat, his
+expression conflicted and anguished as he looks away from the woman who stands
+nearby with tears in her eyes. A stern-looking older gentleman in black stands
+in the background. Cinematic 9:16 portrait with moody, cool lighting.
+
+--- Scene 5 ---
+A moonlit garden at night with wisteria-covered archways. The man from the
+reference image stands vulnerably, his formal facade completely dropped, his
+expression hopeful yet uncertain as he reaches toward the woman who has returned
+to him. Soft silvery moonlight illuminates their faces with romantic warmth.
+Wide 9:16 portrait shot capturing the redemptive emotional climax.

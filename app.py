@@ -158,8 +158,7 @@ def generate_image():
     payload = {
         "prompt": full_prompt,
         "image_urls": [user_photo],
-        "aspect_ratio": "9:16",
-        "output_format": "jpeg",
+        "image_size": {"width": 768, "height": 1344},
         "num_images": 1,
     }
 

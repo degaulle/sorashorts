@@ -165,7 +165,7 @@ def generate_image():
 
     try:
         response = requests.post(
-            "https://fal.run/fal-ai/nano-banana/edit",
+            "https://fal.run/fal-ai/bytedance/seedream/v5/lite/edit",
             headers={
                 "Authorization": f"Key {FAL_KEY}",
                 "Content-Type": "application/json",

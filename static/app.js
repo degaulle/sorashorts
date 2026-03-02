@@ -322,6 +322,43 @@ function showSceneImage(sceneNumber, imageURL, promptText) {
     };
 }
 
+async function pollImageStatus(requestId, sceneNum, totalScenes) {
+    const maxAttempts = 120;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+
+        try {
+            const statusResp = await fetch(`/api/image-status/${requestId}`);
+            const statusData = await statusResp.json();
+            const status = statusData.status;
+
+            const dots = ".".repeat((attempt % 3) + 1);
+            els.statusText.textContent = `Generating scene ${sceneNum} of ${totalScenes}${dots}`;
+
+            if (status === "COMPLETED") {
+                const resultResp = await fetch(`/api/image-result/${requestId}`);
+                const resultData = await resultResp.json();
+                const imageURL = extractImageURL(resultData);
+                if (!imageURL) {
+                    console.log(`Scene ${sceneNum} result:`, JSON.stringify(resultData));
+                    throw new Error(`No image returned for scene ${sceneNum}`);
+                }
+                return imageURL;
+            }
+
+            if (status === "FAILED") {
+                throw new Error(`Image generation failed for scene ${sceneNum}`);
+            }
+        } catch (error) {
+            if (error.message.includes("failed") || error.message.includes("No image")) {
+                throw error;
+            }
+            // Network error — keep polling
+        }
+    }
+    throw new Error(`Scene ${sceneNum} timed out`);
+}
+
 async function startGeneration() {
     showScreen("generate");
     resetStoryboard();
@@ -370,7 +407,8 @@ async function startGeneration() {
             els.statusText.textContent = `Generating scene ${sceneNum} of ${scenes.length}...`;
             els.statusDetail.textContent = scene.prompt;
 
-            const imageResponse = await fetch("/api/generate-image", {
+            // Submit to queue
+            const submitResponse = await fetch("/api/generate-image", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -382,33 +420,37 @@ async function startGeneration() {
                 }),
             });
 
-            if (!imageResponse.ok) {
-                let errMsg = `Failed to generate scene ${sceneNum}`;
+            if (!submitResponse.ok) {
+                let errMsg = `Failed to submit scene ${sceneNum}`;
                 try {
-                    const err = await imageResponse.json();
+                    const err = await submitResponse.json();
                     errMsg = err.error || errMsg;
                 } catch {
-                    errMsg += ` (server returned ${imageResponse.status})`;
+                    errMsg += ` (server returned ${submitResponse.status})`;
                 }
                 throw new Error(errMsg);
             }
 
-            let imageData;
+            let submitData;
             try {
-                imageData = await imageResponse.json();
+                submitData = await submitResponse.json();
             } catch {
-                throw new Error(`Invalid response for scene ${sceneNum}`);
-            }
-            const imageURL = extractImageURL(imageData);
-
-            if (!imageURL) {
-                console.log(
-                    `Scene ${sceneNum} response:`,
-                    JSON.stringify(imageData)
-                );
-                throw new Error(`No image returned for scene ${sceneNum}`);
+                throw new Error(`Invalid response submitting scene ${sceneNum}`);
             }
 
+            const requestId = submitData.request_id;
+            if (!requestId) {
+                // Synchronous result — extract image directly
+                const imageURL = extractImageURL(submitData);
+                if (!imageURL) throw new Error(`No image returned for scene ${sceneNum}`);
+                generatedImages.push(imageURL);
+                scenePrompts.push(scene.prompt);
+                showSceneImage(sceneNum, imageURL, scene.prompt);
+                continue;
+            }
+
+            // Poll for image completion
+            const imageURL = await pollImageStatus(requestId, sceneNum, scenes.length);
             generatedImages.push(imageURL);
             scenePrompts.push(scene.prompt);
             showSceneImage(sceneNum, imageURL, scene.prompt);

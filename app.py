@@ -136,6 +136,7 @@ def generate_storyboard():
 
 @app.route("/api/generate-image", methods=["POST"])
 def generate_image():
+    """Submit image generation to fal.ai queue, return request_id for client polling."""
     data = request.json
     user_photo = data["photo"]  # base64 data URI
     prompt = data["prompt"]  # scene prompt from storyboard
@@ -165,64 +166,55 @@ def generate_image():
         "num_images": 1,
     }
 
-    fal_headers = {
-        "Authorization": f"Key {FAL_KEY}",
-        "Content-Type": "application/json",
-    }
-    fal_url = "https://queue.fal.run/fal-ai/bytedance/seedream/v5/lite/edit"
-
     try:
-        # Submit to queue
-        submit_resp = requests.post(fal_url, headers=fal_headers, json=payload, timeout=60)
+        submit_resp = requests.post(
+            "https://queue.fal.run/fal-ai/bytedance/seedream/v5/lite/edit",
+            headers={
+                "Authorization": f"Key {FAL_KEY}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=60,
+        )
         log.info(f"[GENERATE-IMAGE] Scene {scene_number} submit: {submit_resp.status_code} {submit_resp.text[:500]}")
 
         if submit_resp.status_code != 200:
             return jsonify({"error": f"fal.ai submit error: {submit_resp.text[:500]}"}), submit_resp.status_code
 
-        submit_data = submit_resp.json()
-        req_id = submit_data.get("request_id")
-
-        if not req_id:
-            # Synchronous response — already has the result
-            return jsonify(submit_data)
-
-        # Use URLs returned by fal.ai (base path differs from full model path)
-        status_url = submit_data.get("status_url",
-            f"https://queue.fal.run/fal-ai/bytedance/requests/{req_id}/status")
-        result_url = submit_data.get("response_url",
-            f"https://queue.fal.run/fal-ai/bytedance/requests/{req_id}")
-
-        log.info(f"[GENERATE-IMAGE] Scene {scene_number} polling: status_url={status_url}")
-
-        for attempt in range(120):  # max ~10 minutes
-            time.sleep(5)
-            status_resp = requests.get(status_url, headers={"Authorization": f"Key {FAL_KEY}"}, timeout=30)
-            try:
-                status_data = status_resp.json()
-            except Exception:
-                log.warning(f"[GENERATE-IMAGE] Scene {scene_number} poll #{attempt+1}: non-JSON response: {status_resp.text[:200]}")
-                continue
-            status = status_data.get("status", "UNKNOWN")
-            log.info(f"[GENERATE-IMAGE] Scene {scene_number} poll #{attempt+1}: {status}")
-
-            if status == "COMPLETED":
-                result_resp = requests.get(result_url, headers={"Authorization": f"Key {FAL_KEY}"}, timeout=30)
-                log.info(f"[GENERATE-IMAGE] Scene {scene_number} result: {result_resp.status_code} {result_resp.text[:500]}")
-                try:
-                    return jsonify(result_resp.json())
-                except Exception:
-                    return jsonify({"error": f"Invalid result response: {result_resp.text[:500]}"}), 502
-
-            if status == "FAILED":
-                log.error(f"[GENERATE-IMAGE] Scene {scene_number} FAILED: {status_data}")
-                return jsonify({"error": f"Image generation failed: {json.dumps(status_data)}"}), 500
-
-        return jsonify({"error": "Image generation timed out after 10 minutes"}), 504
+        return jsonify(submit_resp.json())
 
     except Exception as e:
         log.error(f"[GENERATE-IMAGE] Scene {scene_number} exception: {e}")
         log.error(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/image-status/<request_id>")
+def image_status(request_id):
+    response = requests.get(
+        f"https://queue.fal.run/fal-ai/bytedance/requests/{request_id}/status",
+        headers={"Authorization": f"Key {FAL_KEY}"},
+        timeout=30,
+    )
+    log.info(f"[IMAGE-STATUS] {request_id}: {response.text[:300]}")
+    try:
+        return jsonify(response.json())
+    except Exception:
+        return jsonify({"status": "IN_PROGRESS"})
+
+
+@app.route("/api/image-result/<request_id>")
+def image_result(request_id):
+    response = requests.get(
+        f"https://queue.fal.run/fal-ai/bytedance/requests/{request_id}",
+        headers={"Authorization": f"Key {FAL_KEY}"},
+        timeout=30,
+    )
+    log.info(f"[IMAGE-RESULT] {request_id}: {response.status_code} {response.text[:500]}")
+    try:
+        return jsonify(response.json())
+    except Exception:
+        return jsonify({"error": "Invalid response", "raw": response.text[:200]}), 502
 
 
 @app.route("/api/generate-scene-prompt", methods=["POST"])

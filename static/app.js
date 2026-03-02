@@ -423,8 +423,14 @@ async function startGeneration() {
             if (!submitResponse.ok) {
                 let errMsg = `Failed to submit scene ${sceneNum}`;
                 try {
-                    const err = await submitResponse.json();
-                    errMsg = err.error || errMsg;
+                    const text = await submitResponse.text();
+                    try {
+                        const err = JSON.parse(text);
+                        errMsg = err.error || errMsg;
+                    } catch {
+                        // Non-JSON response — include first 200 chars for debugging
+                        errMsg += `: ${text.substring(0, 200)}`;
+                    }
                 } catch {
                     errMsg += ` (server returned ${submitResponse.status})`;
                 }

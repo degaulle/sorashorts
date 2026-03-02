@@ -22,10 +22,29 @@ log = app.logger
 FAL_KEY = os.environ.get("FAL_KEY")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
+APP_VERSION = "2025-02-22-v3"
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    log.error(f"Unhandled exception: {e}")
+    log.error(traceback.format_exc())
+    return jsonify({"error": f"Server error: {str(e)}"}), 500
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/health")
+def health():
+    return jsonify({
+        "status": "ok",
+        "version": APP_VERSION,
+        "fal_key_set": bool(FAL_KEY),
+        "anthropic_key_set": bool(ANTHROPIC_API_KEY),
+    })
 
 
 @app.route("/api/detect-gender", methods=["POST"])

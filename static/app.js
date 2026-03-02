@@ -340,11 +340,22 @@ async function startGeneration() {
         });
 
         if (!storyboardResponse.ok) {
-            const err = await storyboardResponse.json();
-            throw new Error(err.error || "Failed to generate storyboard");
+            let errMsg = "Failed to generate storyboard";
+            try {
+                const err = await storyboardResponse.json();
+                errMsg = err.error || errMsg;
+            } catch {
+                errMsg += ` (server returned ${storyboardResponse.status})`;
+            }
+            throw new Error(errMsg);
         }
 
-        const storyboardData = await storyboardResponse.json();
+        let storyboardData;
+        try {
+            storyboardData = await storyboardResponse.json();
+        } catch {
+            throw new Error("Invalid response from storyboard API");
+        }
         const scenes = storyboardData.scenes;
 
         if (!scenes || scenes.length === 0) {
@@ -438,10 +449,22 @@ async function generateVideo() {
         });
 
         if (!promptResponse.ok) {
-            throw new Error("Failed to generate scene prompt");
+            let errMsg = "Failed to generate scene prompt";
+            try {
+                const err = await promptResponse.json();
+                errMsg = err.error || errMsg;
+            } catch {
+                errMsg += ` (server returned ${promptResponse.status})`;
+            }
+            throw new Error(errMsg);
         }
 
-        const promptData = await promptResponse.json();
+        let promptData;
+        try {
+            promptData = await promptResponse.json();
+        } catch {
+            throw new Error("Invalid response from scene prompt API");
+        }
         const scenePrompt = promptData.prompt;
 
         // Generate video with Kling using the first scene image

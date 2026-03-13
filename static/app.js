@@ -410,7 +410,7 @@ async function startGeneration() {
         // Step 2: Upload photo once, then submit ALL images in parallel
         let completedCount = 0;
 
-        els.statusText.textContent = `Generating all ${scenes.length} scenes in parallel...`;
+        els.statusText.textContent = `Generating ${scenes.length} story scenes...`;
         els.statusDetail.textContent = "Preparing image requests...";
 
         // Upload photo once to avoid sending large base64 with every request
@@ -473,29 +473,44 @@ async function startGeneration() {
         generatedImages = new Array(scenes.length);
         scenePrompts = new Array(scenes.length);
 
-        // Poll all scenes in parallel, show each as it completes
-        await Promise.all(
+        // Poll all scenes in parallel, but reveal images sequentially
+        const imageResults = new Array(scenes.length);
+        const resolvers = new Array(scenes.length);
+        // Create a promise for each slot that resolves when that scene's image is ready
+        const readyPromises = scenes.map((_, i) => new Promise((resolve) => { resolvers[i] = resolve; }));
+
+        // Parallel polling — each stores its result and signals ready
+        const pollAll = Promise.all(
             submissions.map(async ({ scene, sceneNum, submitData }, idx) => {
                 const requestId = submitData.request_id;
                 let imageURL;
 
                 if (!requestId) {
-                    // Synchronous result
                     imageURL = extractImageURL(submitData);
                     if (!imageURL) throw new Error(`No image returned for scene ${sceneNum}`);
                 } else {
                     imageURL = await pollImageStatus(requestId, sceneNum);
                 }
 
+                imageResults[idx] = { imageURL, scene, sceneNum };
                 generatedImages[idx] = imageURL;
                 scenePrompts[idx] = scene.prompt;
-                showSceneImage(sceneNum, imageURL, scene.prompt);
-
-                completedCount++;
-                const dots = ".".repeat((completedCount % 3) + 1);
-                els.statusText.textContent = `${completedCount} of ${scenes.length} scenes ready${dots}`;
+                resolvers[idx]();
             })
         );
+
+        // Sequential display — wait for scene 1 first, then 2, etc.
+        for (let i = 0; i < scenes.length; i++) {
+            await readyPromises[i];
+            const { imageURL, scene, sceneNum } = imageResults[i];
+            showSceneImage(sceneNum, imageURL, scene.prompt);
+            completedCount++;
+            const dots = ".".repeat((completedCount % 3) + 1);
+            els.statusText.textContent = `${completedCount} of ${scenes.length} scenes ready${dots}`;
+            els.statusDetail.textContent = scene.prompt;
+        }
+
+        await pollAll;
 
         // All scenes generated — show Generate Drama button
         els.generateStatus.style.display = "none";

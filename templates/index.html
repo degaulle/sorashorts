@@ -260,24 +260,47 @@
         </div>
     </div>
 
-    <!-- ============ SCREEN 4: RESULT ============ -->
+    <!-- ============ SCREEN 4: RESULT (CLIP-BY-CLIP) ============ -->
     <div id="result-screen" class="screen">
         <nav class="navbar">
             <div class="logo">SORA<span>SHORTS</span></div>
         </nav>
         <div class="result-container">
-            <h2 class="result-heading">Your Drama is Ready</h2>
-            <div class="video-wrapper">
-                <video id="result-video" controls playsinline autoplay loop></video>
+            <h2 class="result-heading" id="result-heading">Generating Clip 1 of 5</h2>
+            <div class="clips-timeline" id="clips-timeline">
+                <!-- Clip cards inserted dynamically -->
             </div>
-            <div class="result-actions">
+            <div class="clip-status" id="clip-status">
+                <div class="status-bar">
+                    <div class="status-dot pulse"></div>
+                    <span id="clip-status-text">Generating clip...</span>
+                </div>
+                <p class="status-detail" id="clip-status-detail">This may take a minute or two...</p>
+            </div>
+            <div class="clip-actions" id="clip-actions" style="display:none">
+                <button class="btn btn-secondary" id="regenerate-clip-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="1,4 1,10 7,10"/>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                    </svg>
+                    Regenerate Clip
+                </button>
+                <button class="btn btn-primary" id="next-clip-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12,5 19,12 12,19"/>
+                    </svg>
+                    Next Clip
+                </button>
+            </div>
+            <div class="final-actions" id="final-actions" style="display:none">
                 <button class="btn btn-primary" id="save-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="7,10 12,15 17,10"/>
                         <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
-                    Save Video
+                    Save All Clips
                 </button>
                 <button class="btn btn-secondary" id="tryagain-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

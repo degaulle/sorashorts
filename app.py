@@ -24,6 +24,9 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 
 APP_VERSION = "2025-02-22-v3"
 
+# In-memory cache for uploaded photos (keyed by a simple token)
+_photo_cache = {}
+
 
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -153,11 +156,30 @@ def generate_storyboard():
     return jsonify({"scenes": scenes})
 
 
+@app.route("/api/upload-photo", methods=["POST"])
+def upload_photo():
+    """Cache the user's photo and return a token to reference it."""
+    import uuid
+    data = request.json
+    photo = data["photo"]
+    token = str(uuid.uuid4())
+    _photo_cache[token] = photo
+    log.info(f"[UPLOAD-PHOTO] Cached photo with token {token}, size {len(photo)}")
+    return jsonify({"photo_token": token})
+
+
 @app.route("/api/generate-image", methods=["POST"])
 def generate_image():
     """Submit image generation to fal.ai queue, return request_id for client polling."""
     data = request.json
-    user_photo = data["photo"]  # base64 data URI
+    # Support both direct photo and cached photo token
+    user_photo = data.get("photo")
+    if not user_photo:
+        photo_token = data.get("photo_token")
+        if photo_token and photo_token in _photo_cache:
+            user_photo = _photo_cache[photo_token]
+        else:
+            return jsonify({"error": "No photo provided"}), 400
     prompt = data["prompt"]  # scene prompt from storyboard
     scene_number = data.get("scene_number", 1)
     gender = data.get("gender", "male")
@@ -318,4 +340,4 @@ def video_result(request_id):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 3000))
-    app.run(debug=True, host="0.0.0.0", port=port)
+    app.run(debug=True, host="0.0.0.0", port=port, threaded=True)

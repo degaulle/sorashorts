@@ -473,13 +473,16 @@ html, body {
 }
 
 .generate-status {
-    text-align: center;
+    /* Match storyboard width: 5×150px cards + 4×16px gaps + 8px padding */
+    max-width: 822px;
+    width: 100%;
+    margin: 0 auto;
 }
 
 .status-bar {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 10px;
     margin-bottom: 8px;
 }
@@ -503,11 +506,15 @@ html, body {
 #status-text {
     font-size: 18px;
     font-weight: 600;
+    text-align: left;
 }
 
 .status-detail {
     font-size: 14px;
     color: var(--text-muted);
+    text-align: left;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .btn-generate-drama {
@@ -532,13 +539,12 @@ html, body {
     to { transform: rotate(360deg); }
 }
 
-/* ===== SCREEN 4: RESULT ===== */
+/* ===== SCREEN 4: RESULT (CLIP-BY-CLIP) ===== */
 .result-container {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     padding: 100px 20px 40px;
     min-height: 100vh;
 }
@@ -548,25 +554,107 @@ html, body {
     font-size: 40px;
     letter-spacing: 2px;
     margin-bottom: 24px;
+    text-align: center;
 }
 
-.video-wrapper {
-    width: 300px;
+/* Clips timeline */
+.clips-timeline {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    align-items: flex-start;
+    margin-bottom: 28px;
+    overflow-x: auto;
+    padding: 4px 16px;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.clip-card {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.3s ease;
+}
+
+.clip-card.past {
+    opacity: 0.6;
+}
+
+.clip-card.current {
+    opacity: 1;
+}
+
+.clip-video-wrapper {
+    width: 200px;
     aspect-ratio: 9/16;
     border-radius: 12px;
     overflow: hidden;
     background: #000;
-    margin-bottom: 28px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+    position: relative;
+    transition: box-shadow 0.3s ease;
 }
 
-.video-wrapper video {
+.clip-card.current .clip-video-wrapper {
+    box-shadow: 0 0 0 2px var(--red), 0 8px 32px rgba(229, 9, 20, 0.3);
+}
+
+.clip-video-wrapper video {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.result-actions {
+.clip-video-wrapper .clip-generating {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: var(--bg-card);
+}
+
+.clip-video-wrapper .clip-generating .spinner-small {
+    width: 36px;
+    height: 36px;
+}
+
+.clip-generating-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.clip-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.clip-card.current .clip-label {
+    color: var(--red);
+}
+
+/* Clip status and actions */
+.clip-status {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.clip-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.final-actions {
     display: flex;
     gap: 12px;
 }
@@ -745,11 +833,16 @@ html, body {
         padding: 4px 16px;
     }
 
-    .video-wrapper {
-        width: 260px;
+    .clip-video-wrapper {
+        width: 150px;
     }
 
-    .result-actions {
+    .clips-timeline {
+        justify-content: flex-start;
+    }
+
+    .clip-actions,
+    .final-actions {
         flex-direction: column;
         width: 100%;
         max-width: 260px;

@@ -5,6 +5,8 @@ let selectedShow = null;
 let generatedImages = []; // array of image URLs for 5 scenes
 let scenePrompts = []; // array of scene prompt texts
 let videoURL = null;
+let generatedClips = []; // array of video URLs per clip
+let currentClipIndex = 0; // which clip we're generating
 
 // ===== DOM REFS =====
 const screens = {
@@ -46,6 +48,15 @@ const els = {
     errorOverlay: document.getElementById("error-overlay"),
     errorMessage: document.getElementById("error-message"),
     errorCloseBtn: document.getElementById("error-close-btn"),
+    clipsTimeline: document.getElementById("clips-timeline"),
+    clipStatus: document.getElementById("clip-status"),
+    clipStatusText: document.getElementById("clip-status-text"),
+    clipStatusDetail: document.getElementById("clip-status-detail"),
+    clipActions: document.getElementById("clip-actions"),
+    regenerateClipBtn: document.getElementById("regenerate-clip-btn"),
+    nextClipBtn: document.getElementById("next-clip-btn"),
+    finalActions: document.getElementById("final-actions"),
+    resultHeading: document.getElementById("result-heading"),
 };
 
 // ===== SCREEN MANAGEMENT =====
@@ -322,18 +333,15 @@ function showSceneImage(sceneNumber, imageURL, promptText) {
     };
 }
 
-async function pollImageStatus(requestId, sceneNum, totalScenes) {
-    const maxAttempts = 120;
+async function pollImageStatus(requestId, sceneNum) {
+    const maxAttempts = 180;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
         try {
             const statusResp = await fetch(`/api/image-status/${requestId}`);
             const statusData = await statusResp.json();
             const status = statusData.status;
-
-            const dots = ".".repeat((attempt % 3) + 1);
-            els.statusText.textContent = `Generating scene ${sceneNum} of ${totalScenes}${dots}`;
 
             if (status === "COMPLETED") {
                 const resultResp = await fetch(`/api/image-result/${requestId}`);
@@ -399,68 +407,95 @@ async function startGeneration() {
             throw new Error("No scenes returned from storyboard generation");
         }
 
-        // Step 2: Generate images sequentially, showing each as it arrives
-        for (let i = 0; i < scenes.length; i++) {
-            const scene = scenes[i];
-            const sceneNum = scene.scene_number || i + 1;
+        // Step 2: Upload photo once, then submit ALL images in parallel
+        let completedCount = 0;
 
-            els.statusText.textContent = `Generating scene ${sceneNum} of ${scenes.length}...`;
-            els.statusDetail.textContent = scene.prompt;
+        els.statusText.textContent = `Generating all ${scenes.length} scenes in parallel...`;
+        els.statusDetail.textContent = "Preparing image requests...";
 
-            // Submit to queue
-            const submitResponse = await fetch("/api/generate-image", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    photo: userPhotoDataURI,
-                    prompt: scene.prompt,
-                    show_name: selectedShow,
-                    scene_number: sceneNum,
-                    gender: detectedGender,
-                }),
-            });
+        // Upload photo once to avoid sending large base64 with every request
+        const uploadResp = await fetch("/api/upload-photo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ photo: userPhotoDataURI }),
+        });
+        if (!uploadResp.ok) throw new Error("Failed to upload photo");
+        const { photo_token } = await uploadResp.json();
 
-            if (!submitResponse.ok) {
-                let errMsg = `Failed to submit scene ${sceneNum}`;
-                try {
-                    const text = await submitResponse.text();
+        els.statusDetail.textContent = "Submitting image requests...";
+
+        // Submit all scenes to fal.ai queue simultaneously
+        const submissions = await Promise.all(
+            scenes.map(async (scene, i) => {
+                const sceneNum = scene.scene_number || i + 1;
+                const submitResponse = await fetch("/api/generate-image", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        photo_token: photo_token,
+                        prompt: scene.prompt,
+                        show_name: selectedShow,
+                        scene_number: sceneNum,
+                        gender: detectedGender,
+                    }),
+                });
+
+                if (!submitResponse.ok) {
+                    let errMsg = `Failed to submit scene ${sceneNum}`;
                     try {
-                        const err = JSON.parse(text);
-                        errMsg = err.error || errMsg;
+                        const text = await submitResponse.text();
+                        try {
+                            const err = JSON.parse(text);
+                            errMsg = err.error || errMsg;
+                        } catch {
+                            errMsg += `: ${text.substring(0, 200)}`;
+                        }
                     } catch {
-                        // Non-JSON response — include first 200 chars for debugging
-                        errMsg += `: ${text.substring(0, 200)}`;
+                        errMsg += ` (server returned ${submitResponse.status})`;
                     }
-                } catch {
-                    errMsg += ` (server returned ${submitResponse.status})`;
+                    throw new Error(errMsg);
                 }
-                throw new Error(errMsg);
-            }
 
-            let submitData;
-            try {
-                submitData = await submitResponse.json();
-            } catch {
-                throw new Error(`Invalid response submitting scene ${sceneNum}`);
-            }
+                let submitData;
+                try {
+                    submitData = await submitResponse.json();
+                } catch {
+                    throw new Error(`Invalid response submitting scene ${sceneNum}`);
+                }
 
-            const requestId = submitData.request_id;
-            if (!requestId) {
-                // Synchronous result — extract image directly
-                const imageURL = extractImageURL(submitData);
-                if (!imageURL) throw new Error(`No image returned for scene ${sceneNum}`);
-                generatedImages.push(imageURL);
-                scenePrompts.push(scene.prompt);
+                return { scene, sceneNum, submitData };
+            })
+        );
+
+        els.statusDetail.textContent = "All scenes submitted, waiting for results...";
+
+        // Pre-allocate arrays so parallel results land in correct order
+        generatedImages = new Array(scenes.length);
+        scenePrompts = new Array(scenes.length);
+
+        // Poll all scenes in parallel, show each as it completes
+        await Promise.all(
+            submissions.map(async ({ scene, sceneNum, submitData }, idx) => {
+                const requestId = submitData.request_id;
+                let imageURL;
+
+                if (!requestId) {
+                    // Synchronous result
+                    imageURL = extractImageURL(submitData);
+                    if (!imageURL) throw new Error(`No image returned for scene ${sceneNum}`);
+                } else {
+                    imageURL = await pollImageStatus(requestId, sceneNum);
+                }
+
+                generatedImages[idx] = imageURL;
+                scenePrompts[idx] = scene.prompt;
                 showSceneImage(sceneNum, imageURL, scene.prompt);
-                continue;
-            }
 
-            // Poll for image completion
-            const imageURL = await pollImageStatus(requestId, sceneNum, scenes.length);
-            generatedImages.push(imageURL);
-            scenePrompts.push(scene.prompt);
-            showSceneImage(sceneNum, imageURL, scene.prompt);
-        }
+                completedCount++;
+                const dots = ".".repeat((completedCount % 3) + 1);
+                els.statusText.textContent = `${completedCount} of ${scenes.length} scenes ready${dots}`;
+            })
+        );
 
         // All scenes generated — show Generate Drama button
         els.generateStatus.style.display = "none";
@@ -476,61 +511,109 @@ async function startGeneration() {
     }
 }
 
-// ===== VIDEO GENERATION =====
+// ===== VIDEO GENERATION (CLIP-BY-CLIP) =====
 els.generateDramaBtn.addEventListener("click", () => {
-    generateVideo();
+    startClipGeneration();
 });
 
-async function generateVideo() {
-    els.generateDramaBtn.style.display = "none";
-    els.generateStatus.style.display = "";
+function resetClipsUI() {
+    generatedClips = [];
+    currentClipIndex = 0;
+    els.clipsTimeline.innerHTML = "";
+    els.clipActions.style.display = "none";
+    els.finalActions.style.display = "none";
+    els.clipStatus.style.display = "";
+}
+
+function createClipCard(index, isGenerating) {
+    const card = document.createElement("div");
+    card.className = `clip-card ${isGenerating ? "current" : "past"}`;
+    card.dataset.clip = index;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "clip-video-wrapper";
+
+    if (isGenerating) {
+        const generating = document.createElement("div");
+        generating.className = "clip-generating";
+        generating.innerHTML = `<div class="spinner-small"></div><span class="clip-generating-text">Generating...</span>`;
+        wrapper.appendChild(generating);
+    }
+
+    const label = document.createElement("span");
+    label.className = "clip-label";
+    label.textContent = `Clip ${index + 1}`;
+
+    card.appendChild(wrapper);
+    card.appendChild(label);
+    els.clipsTimeline.appendChild(card);
+
+    // Scroll to make the new card visible
+    card.scrollIntoView({ behavior: "smooth", inline: "center" });
+
+    return card;
+}
+
+function showClipVideo(index, videoUrl) {
+    const card = els.clipsTimeline.querySelector(`.clip-card[data-clip="${index}"]`);
+    if (!card) return;
+
+    const wrapper = card.querySelector(".clip-video-wrapper");
+    wrapper.innerHTML = "";
+
+    const video = document.createElement("video");
+    video.src = videoUrl;
+    video.controls = true;
+    video.playsinline = true;
+    video.autoplay = true;
+    video.loop = true;
+    video.muted = true;
+    wrapper.appendChild(video);
+}
+
+async function startClipGeneration() {
+    showScreen("result");
+    resetClipsUI();
+    await generateClip(0);
+}
+
+async function generateClip(index) {
+    currentClipIndex = index;
+    const totalClips = generatedImages.length;
+
+    els.resultHeading.textContent = `Generating Clip ${index + 1} of ${totalClips}`;
+    els.clipActions.style.display = "none";
+    els.finalActions.style.display = "none";
+    els.clipStatus.style.display = "";
+    els.clipStatusText.textContent = `Generating clip ${index + 1}...`;
+    els.clipStatusDetail.textContent = "This may take a minute or two...";
+
+    // Mark previous clips as past
+    els.clipsTimeline.querySelectorAll(".clip-card").forEach((c) => c.classList.replace("current", "past"));
+
+    // Create or replace the card for this clip
+    let existingCard = els.clipsTimeline.querySelector(`.clip-card[data-clip="${index}"]`);
+    if (existingCard) {
+        existingCard.remove();
+    }
+    createClipCard(index, true);
 
     try {
-        // Generate scene prompt with Claude
-        els.statusText.textContent = "Generating drama...";
-        els.statusDetail.textContent = "Writing your scene with AI";
-
-        const promptResponse = await fetch("/api/generate-scene-prompt", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ show_name: selectedShow }),
-        });
-
-        if (!promptResponse.ok) {
-            let errMsg = "Failed to generate scene prompt";
-            try {
-                const err = await promptResponse.json();
-                errMsg = err.error || errMsg;
-            } catch {
-                errMsg += ` (server returned ${promptResponse.status})`;
-            }
-            throw new Error(errMsg);
-        }
-
-        let promptData;
-        try {
-            promptData = await promptResponse.json();
-        } catch {
-            throw new Error("Invalid response from scene prompt API");
-        }
-        const scenePrompt = promptData.prompt;
-
-        // Generate video with Kling using the first scene image
-        els.statusText.textContent = "Generating drama...";
-        els.statusDetail.textContent = "Creating your short drama video";
+        // Use the scene prompt for this clip
+        const scenePrompt = scenePrompts[index] || `Scene ${index + 1}`;
 
         const videoResponse = await fetch("/api/generate-video", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                image_url: generatedImages[0],
+                image_url: generatedImages[index],
                 prompt: scenePrompt,
             }),
         });
 
         if (!videoResponse.ok) {
             const err = await videoResponse.json();
-            throw new Error(err.error || "Failed to start video generation");
+            throw new Error(err.error || `Failed to start clip ${index + 1}`);
         }
 
         const videoData = await videoResponse.json();
@@ -538,22 +621,24 @@ async function generateVideo() {
 
         if (!requestId) {
             if (videoData.video && videoData.video.url) {
-                videoURL = videoData.video.url;
-                showVideoResult();
+                onClipReady(index, videoData.video.url);
                 return;
             }
             throw new Error("No request ID returned from video generation");
         }
 
-        els.statusDetail.textContent = "This may take a minute or two...";
-        await pollVideoStatus(requestId);
+        await pollClipStatus(requestId, index);
     } catch (error) {
-        console.error("Generation error:", error);
-        showError(error.message || "Something went wrong during generation");
+        console.error(`Clip ${index + 1} error:`, error);
+        els.clipStatus.style.display = "none";
+        showError(error.message || `Failed to generate clip ${index + 1}`);
+        // Show regenerate button even on error
+        els.clipActions.style.display = "";
+        els.nextClipBtn.style.display = index < totalClips - 1 ? "" : "none";
     }
 }
 
-async function pollVideoStatus(requestId) {
+async function pollClipStatus(requestId, clipIndex) {
     const maxAttempts = 120;
     let attempt = 0;
 
@@ -561,69 +646,98 @@ async function pollVideoStatus(requestId) {
         attempt++;
 
         try {
-            const statusResponse = await fetch(
-                `/api/video-status/${requestId}`
-            );
+            const statusResponse = await fetch(`/api/video-status/${requestId}`);
             const statusData = await statusResponse.json();
             const status = statusData.status;
 
             if (status === "COMPLETED") {
-                const resultResponse = await fetch(
-                    `/api/video-result/${requestId}`
-                );
+                const resultResponse = await fetch(`/api/video-result/${requestId}`);
                 const resultData = await resultResponse.json();
 
                 if (resultData.video && resultData.video.url) {
-                    videoURL = resultData.video.url;
-                    showVideoResult();
+                    onClipReady(clipIndex, resultData.video.url);
                     return;
                 }
                 throw new Error("Video completed but no URL returned");
             }
 
             if (status === "FAILED") {
-                throw new Error("Video generation failed");
+                throw new Error(`Clip ${clipIndex + 1} generation failed`);
             }
 
             const dots = ".".repeat((attempt % 3) + 1);
-            els.statusDetail.textContent = `Rendering your drama${dots}`;
+            els.clipStatusDetail.textContent = `Rendering clip ${clipIndex + 1}${dots}`;
         } catch (error) {
             if (
-                error.message === "Video generation failed" ||
-                error.message === "Video completed but no URL returned"
+                error.message.includes("failed") ||
+                error.message.includes("no URL")
             ) {
                 throw error;
             }
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
     }
 
-    throw new Error("Video generation timed out");
+    throw new Error(`Clip ${clipIndex + 1} timed out`);
 }
 
-function showVideoResult() {
-    els.resultVideo.src = videoURL;
-    showScreen("result");
+function onClipReady(index, videoUrl) {
+    generatedClips[index] = videoUrl;
+    showClipVideo(index, videoUrl);
+
+    els.clipStatus.style.display = "none";
+
+    const totalClips = generatedImages.length;
+    const isLastClip = index >= totalClips - 1;
+
+    if (isLastClip) {
+        // All clips done
+        els.resultHeading.textContent = "Your Drama Clips Are Ready";
+        els.clipActions.style.display = "none";
+        els.finalActions.style.display = "";
+    } else {
+        // Show regenerate + next buttons
+        els.resultHeading.textContent = `Clip ${index + 1} of ${totalClips} Ready`;
+        els.clipActions.style.display = "";
+        els.nextClipBtn.style.display = "";
+    }
 }
+
+// Regenerate current clip
+els.regenerateClipBtn.addEventListener("click", () => {
+    generateClip(currentClipIndex);
+});
+
+// Generate next clip
+els.nextClipBtn.addEventListener("click", () => {
+    // Mark current clip card as past
+    const currentCard = els.clipsTimeline.querySelector(`.clip-card[data-clip="${currentClipIndex}"]`);
+    if (currentCard) currentCard.classList.replace("current", "past");
+
+    generateClip(currentClipIndex + 1);
+});
 
 // ===== RESULT ACTIONS =====
 els.saveBtn.addEventListener("click", async () => {
-    if (!videoURL) return;
-
-    try {
-        const response = await fetch(videoURL);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `SoraShorts-${selectedShow.replace(/\s+/g, "-")}.mp4`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    } catch {
-        window.open(videoURL, "_blank");
+    // Download each clip
+    for (let i = 0; i < generatedClips.length; i++) {
+        const url = generatedClips[i];
+        if (!url) continue;
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = `SoraShorts-${selectedShow.replace(/\s+/g, "-")}-clip${i + 1}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(blobUrl);
+        } catch {
+            window.open(url, "_blank");
+        }
     }
 });
 
@@ -631,9 +745,11 @@ els.tryagainBtn.addEventListener("click", () => {
     videoURL = null;
     generatedImages = [];
     scenePrompts = [];
+    generatedClips = [];
+    currentClipIndex = 0;
     detectedGender = null;
     selectedShow = null;
-    els.resultVideo.src = "";
+    els.clipsTimeline.innerHTML = "";
     els.customShowInput.value = "";
     showScreen("select");
 });

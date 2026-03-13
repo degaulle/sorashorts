@@ -601,7 +601,7 @@ async function generateClip(index) {
     els.finalActions.style.display = "none";
     els.clipStatus.style.display = "";
     els.clipStatusText.textContent = `Generating clip ${index + 1}...`;
-    els.clipStatusDetail.textContent = "This may take a minute or two...";
+    els.clipStatusDetail.textContent = scenePrompts[index] || "This may take a minute or two...";
 
     // Mark previous clips as past
     els.clipsTimeline.querySelectorAll(".clip-card").forEach((c) => c.classList.replace("current", "past"));
@@ -680,8 +680,7 @@ async function pollClipStatus(requestId, clipIndex) {
                 throw new Error(`Clip ${clipIndex + 1} generation failed`);
             }
 
-            const dots = ".".repeat((attempt % 3) + 1);
-            els.clipStatusDetail.textContent = `Rendering clip ${clipIndex + 1}${dots}`;
+            // Keep showing the scene prompt during polling (no change needed)
         } catch (error) {
             if (
                 error.message.includes("failed") ||

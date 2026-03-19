@@ -64,7 +64,7 @@ def detect_gender():
     header, b64_data = photo.split(",", 1)
     media_type = header.split(":")[1].split(";")[0]
 
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = Anthropic(api_key=ANTHROPIC_API_KEY, timeout=600.0)
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=10,
@@ -118,12 +118,12 @@ def generate_storyboard():
         pronoun_obj = "him"
         pronoun_pos = "his"
 
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = Anthropic(api_key=ANTHROPIC_API_KEY, timeout=600.0)
 
     try:
         log.info(f"[STORYBOARD] Calling Claude for show='{show_name}', gender={gender}, user_name='{user_name}'")
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-opus-4-6",
             max_tokens=2000,
             messages=[
                 {
@@ -210,7 +210,7 @@ def expand_video_prompt():
 
     scenes_text = "\n".join(f"Scene {i+1}: {s}" for i, s in enumerate(scenes))
 
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = Anthropic(api_key=ANTHROPIC_API_KEY, timeout=600.0)
     message = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=2000,
@@ -358,7 +358,7 @@ def generate_scene_prompt():
     data = request.json
     show_name = data["show_name"]
 
-    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    client = Anthropic(api_key=ANTHROPIC_API_KEY, timeout=600.0)
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=300,

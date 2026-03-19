@@ -2,11 +2,14 @@
 let userPhotoDataURI = null;
 let detectedGender = null;
 let selectedShow = null;
-let generatedImages = []; // array of image URLs for 5 scenes
-let scenePrompts = []; // array of scene prompt texts
+let generatedImages = []; // array of image URLs for video generation
+let scenePrompts = []; // array of scene prompt texts for video generation
 let videoURL = null;
 let generatedClips = []; // array of video URLs per clip
 let currentClipIndex = 0; // which clip we're generating
+let actData = []; // [{act_number, title, prompt, scenes, imageURL}, ...]
+let photoToken = null; // cached for image gen calls
+let userName = null; // user's name for storyboard
 
 // ===== DOM REFS =====
 const screens = {
@@ -29,6 +32,7 @@ const els = {
     photoPreview: document.getElementById("photo-preview"),
     retakeBtn: document.getElementById("retake-btn"),
     continueBtn: document.getElementById("continue-btn"),
+    userNameInput: document.getElementById("user-name-input"),
     navPhoto: document.getElementById("nav-photo"),
     customShowInput: document.getElementById("custom-show"),
     customShowBtn: document.getElementById("custom-show-btn"),
@@ -37,7 +41,6 @@ const els = {
     generateStatus: document.getElementById("generate-status"),
     statusText: document.getElementById("status-text"),
     statusDetail: document.getElementById("status-detail"),
-    generateDramaBtn: document.getElementById("generate-drama-btn"),
     resultVideo: document.getElementById("result-video"),
     saveBtn: document.getElementById("save-btn"),
     tryagainBtn: document.getElementById("tryagain-btn"),
@@ -45,6 +48,9 @@ const els = {
     lightboxImage: document.getElementById("lightbox-image"),
     lightboxCaption: document.getElementById("lightbox-caption"),
     lightboxClose: document.getElementById("lightbox-close"),
+    videoLightboxOverlay: document.getElementById("video-lightbox-overlay"),
+    videoLightboxPlayer: document.getElementById("video-lightbox-player"),
+    videoLightboxClose: document.getElementById("video-lightbox-close"),
     errorOverlay: document.getElementById("error-overlay"),
     errorMessage: document.getElementById("error-message"),
     errorCloseBtn: document.getElementById("error-close-btn"),
@@ -57,6 +63,8 @@ const els = {
     nextClipBtn: document.getElementById("next-clip-btn"),
     finalActions: document.getElementById("final-actions"),
     resultHeading: document.getElementById("result-heading"),
+    mergeClipsBtn: document.getElementById("merge-clips-btn"),
+    mergeAllBtn: document.getElementById("merge-all-btn"),
 };
 
 // ===== SCREEN MANAGEMENT =====
@@ -208,6 +216,15 @@ els.retakeBtn.addEventListener("click", () => {
 els.continueBtn.addEventListener("click", async () => {
     if (!userPhotoDataURI) return;
 
+    // Read user name
+    const nameVal = els.userNameInput.value.trim();
+    if (!nameVal) {
+        els.userNameInput.focus();
+        els.userNameInput.style.borderColor = "var(--red)";
+        return;
+    }
+    userName = nameVal;
+
     // Detect gender from photo
     const origText = els.continueBtn.textContent;
     els.continueBtn.textContent = "Analyzing...";
@@ -237,6 +254,15 @@ els.continueBtn.addEventListener("click", async () => {
 });
 
 // ===== SHOW SELECTION =====
+// Shuffle show cards randomly
+const showsGrid = document.querySelector(".shows-grid");
+const showCards = [...showsGrid.querySelectorAll(".show-card")];
+for (let i = showCards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    showsGrid.appendChild(showCards[j]);
+    showCards[j] = showCards[i];
+}
+
 // Clicking a show card
 document.querySelectorAll(".show-card").forEach((card) => {
     card.addEventListener("click", () => {
@@ -279,6 +305,26 @@ els.lightboxOverlay.addEventListener("click", (e) => {
     if (e.target === els.lightboxOverlay) closeLightbox();
 });
 
+// ===== VIDEO LIGHTBOX =====
+function openVideoLightbox(videoUrl) {
+    els.videoLightboxPlayer.src = videoUrl;
+    els.videoLightboxPlayer.muted = false;
+    els.videoLightboxPlayer.currentTime = 0;
+    els.videoLightboxOverlay.style.display = "flex";
+    els.videoLightboxPlayer.play();
+}
+
+function closeVideoLightbox() {
+    els.videoLightboxPlayer.pause();
+    els.videoLightboxPlayer.src = "";
+    els.videoLightboxOverlay.style.display = "none";
+}
+
+els.videoLightboxClose.addEventListener("click", closeVideoLightbox);
+els.videoLightboxOverlay.addEventListener("click", (e) => {
+    if (e.target === els.videoLightboxOverlay) closeVideoLightbox();
+});
+
 // ===== HELPER: extract image URL from fal.ai response =====
 function extractImageURL(imageData) {
     if (imageData.images && imageData.images.length > 0) {
@@ -295,42 +341,230 @@ function extractImageURL(imageData) {
 function resetStoryboard() {
     generatedImages = [];
     scenePrompts = [];
-    const scenes = els.storyboard.querySelectorAll(".storyboard-scene");
-    scenes.forEach((scene) => {
-        const img = scene.querySelector(".scene-image");
-        const placeholder = scene.querySelector(".scene-placeholder");
-        const tooltip = scene.querySelector(".scene-tooltip");
-        img.classList.remove("visible");
-        img.src = "";
-        img.onclick = null;
-        placeholder.classList.remove("hidden");
-        if (tooltip) tooltip.textContent = "";
-    });
+    actData = [];
+    photoToken = null;
+    els.storyboard.innerHTML = "";
 }
 
-function showSceneImage(sceneNumber, imageURL, promptText) {
-    const scene = els.storyboard.querySelector(
-        `.storyboard-scene[data-scene="${sceneNumber}"]`
-    );
-    if (!scene) return;
+function createActCard(act) {
+    const actNum = act.act_number;
+    const card = document.createElement("div");
+    card.className = "act-card";
+    card.dataset.act = actNum;
 
-    const img = scene.querySelector(".scene-image");
-    const placeholder = scene.querySelector(".scene-placeholder");
-    const tooltip = scene.querySelector(".scene-tooltip");
+    // Header
+    const header = document.createElement("div");
+    header.className = "act-header";
+    const numEl = document.createElement("span");
+    numEl.className = "act-number";
+    numEl.textContent = `ACT ${actNum}`;
+    const titleEl = document.createElement("span");
+    titleEl.className = "act-title";
+    titleEl.textContent = act.title || "";
+    header.appendChild(numEl);
+    header.appendChild(titleEl);
 
-    // Set tooltip text (hover description)
-    tooltip.textContent = promptText || "";
+    // Body
+    const body = document.createElement("div");
+    body.className = "act-body";
+
+    // Thumbnail
+    const thumbWrap = document.createElement("div");
+    thumbWrap.className = "act-thumbnail-wrap";
+    const placeholder = document.createElement("div");
+    placeholder.className = "act-thumbnail-placeholder";
+    placeholder.innerHTML = '<div class="spinner-small"></div>';
+    const img = document.createElement("img");
+    img.alt = `Act ${actNum}`;
+    thumbWrap.appendChild(placeholder);
+    thumbWrap.appendChild(img);
+
+    // Scenes list
+    const scenesEl = document.createElement("div");
+    scenesEl.className = "act-scenes";
+    if (act.scenes && act.scenes.length > 0) {
+        act.scenes.forEach((scene, i) => {
+            const line = document.createElement("div");
+            line.className = "act-scene-line";
+            // Strip any "Scene X:" prefix Claude may have included
+            const cleanScene = scene.replace(/^Scene\s*\d+\s*:\s*/i, "");
+            line.innerHTML = `<span class="scene-num">Scene ${i + 1}:</span> ${cleanScene}`;
+            scenesEl.appendChild(line);
+        });
+    }
+
+    // Generate Video button (hidden until image loads)
+    const genBtn = document.createElement("button");
+    genBtn.className = "act-generate-btn";
+    genBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg> Generate Video`;
+    genBtn.addEventListener("click", () => generateActVideo(actNum));
+
+    body.appendChild(thumbWrap);
+    body.appendChild(scenesEl);
+    body.appendChild(genBtn);
+
+    card.appendChild(header);
+    card.appendChild(body);
+    els.storyboard.appendChild(card);
+
+    return card;
+}
+
+function showActImage(actNumber, imageURL) {
+    const card = els.storyboard.querySelector(`.act-card[data-act="${actNumber}"]`);
+    if (!card) return;
+
+    const img = card.querySelector(".act-thumbnail-wrap img");
+    const placeholder = card.querySelector(".act-thumbnail-placeholder");
+    const genBtn = card.querySelector(".act-generate-btn");
 
     img.src = imageURL;
     img.onload = () => {
         placeholder.classList.add("hidden");
         img.classList.add("visible");
+        genBtn.classList.add("visible");
     };
 
-    // Click to enlarge
-    img.onclick = () => {
-        openLightbox(imageURL, promptText);
-    };
+    img.onclick = () => openLightbox(imageURL, actData.find(a => a.act_number === actNumber)?.prompt || "");
+}
+
+async function generateActVideo(actNumber) {
+    const act = actData.find(a => a.act_number === actNumber);
+    if (!act) return;
+
+    const card = els.storyboard.querySelector(`.act-card[data-act="${actNumber}"]`);
+    if (!card) return;
+
+    const genBtn = card.querySelector(".act-generate-btn");
+    genBtn.disabled = true;
+    genBtn.innerHTML = `<div class="spinner-small" style="width:16px;height:16px;"></div> Expanding scenes...`;
+
+    const thumbWrap = card.querySelector(".act-thumbnail-wrap");
+
+    try {
+        // Step 1: Call Opus to expand scene descriptions into detailed video prompt
+        const expandResp = await fetch("/api/expand-video-prompt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                show_name: selectedShow,
+                act_title: act.title,
+                scenes: act.scenes || [],
+                all_acts: actData.map(a => ({ act_number: a.act_number, title: a.title })),
+            }),
+        });
+
+        if (!expandResp.ok) {
+            const err = await expandResp.json().catch(() => ({}));
+            throw new Error(err.error || "Failed to expand video prompt");
+        }
+
+        const expandData = await expandResp.json();
+        const videoPrompt = expandData.video_prompt;
+
+        console.log(`[VIDEO] Act ${actNumber} expanded prompt (${videoPrompt ? videoPrompt.length : 0} chars):`, videoPrompt);
+
+        if (!videoPrompt || videoPrompt.trim().length === 0) {
+            console.error(`[VIDEO] Act ${actNumber}: expanded prompt is EMPTY!`);
+            throw new Error("Video prompt expansion returned empty result");
+        }
+
+        // Step 2: Show spinner on thumbnail, submit to Sora 2
+        genBtn.innerHTML = `<div class="spinner-small" style="width:16px;height:16px;"></div> Generating video...`;
+
+        const overlay = document.createElement("div");
+        overlay.className = "subscene-generating";
+        overlay.innerHTML = '<div class="spinner-small"></div>';
+        thumbWrap.appendChild(overlay);
+
+        const videoPayload = {
+            image_url: act.imageURL,
+            prompt: videoPrompt,
+        };
+        console.log(`[VIDEO] Act ${actNumber} sending to /api/generate-video:`, JSON.stringify(videoPayload).substring(0, 500));
+
+        const resp = await fetch("/api/generate-video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(videoPayload),
+        });
+
+        if (!resp.ok) {
+            throw new Error("Video generation request rejected");
+        }
+
+        const submitData = await resp.json();
+
+        let videoUrl = null;
+        if (!submitData.request_id) {
+            if (submitData.video && submitData.video.url) {
+                videoUrl = submitData.video.url;
+            }
+        } else {
+            videoUrl = await pollVideoForAct(submitData.request_id);
+        }
+
+        // Remove overlay
+        const ov = thumbWrap.querySelector(".subscene-generating");
+        if (ov) ov.remove();
+
+        if (videoUrl) {
+            // Replace image with video
+            const img = thumbWrap.querySelector("img");
+            if (img) img.style.display = "none";
+
+            const video = document.createElement("video");
+            video.src = videoUrl;
+            video.autoplay = true;
+            video.loop = true;
+            video.muted = true;
+            video.playsInline = true;
+            video.style.cursor = "pointer";
+            video.addEventListener("click", () => openVideoLightbox(videoUrl));
+            thumbWrap.appendChild(video);
+
+            genBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg> Done`;
+            genBtn.disabled = true;
+        } else {
+            throw new Error("Video generation failed or was refused");
+        }
+
+    } catch (error) {
+        console.error(`Generate act ${actNumber} video error:`, error);
+        const ov = thumbWrap.querySelector(".subscene-generating");
+        if (ov) ov.remove();
+        genBtn.disabled = false;
+        genBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg> Generate Video`;
+        showError(error.message || "Failed to generate video");
+    }
+}
+
+async function pollVideoForAct(requestId) {
+    const maxAttempts = 180;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        try {
+            const statusResp = await fetch(`/api/video-status/${requestId}`);
+            const statusData = await statusResp.json();
+
+            if (statusData.status === "COMPLETED") {
+                const resultResp = await fetch(`/api/video-result/${requestId}`);
+                const resultData = await resultResp.json();
+                if (resultData.video && resultData.video.url) {
+                    return resultData.video.url;
+                }
+                return null;
+            }
+
+            if (statusData.status === "FAILED") {
+                return null;
+            }
+        } catch (error) {
+            // Network error — keep polling
+        }
+    }
+    return null;
 }
 
 async function pollImageStatus(requestId, sceneNum) {
@@ -371,17 +605,16 @@ async function startGeneration() {
     showScreen("generate");
     resetStoryboard();
     els.generateStatus.style.display = "";
-    els.generateDramaBtn.style.display = "none";
     els.statusText.textContent = "Writing your storyboard...";
     els.statusDetail.textContent =
-        "AI is crafting a 5-scene plot for " + selectedShow;
+        "AI is crafting a 5-act plot for " + selectedShow;
 
     try {
-        // Step 1: Generate 5 storyboard prompts with Claude
+        // Step 1: Generate 5 act prompts with Claude
         const storyboardResponse = await fetch("/api/generate-storyboard", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ show_name: selectedShow, gender: detectedGender }),
+            body: JSON.stringify({ show_name: selectedShow, gender: detectedGender, user_name: userName }),
         });
 
         if (!storyboardResponse.ok) {
@@ -401,47 +634,53 @@ async function startGeneration() {
         } catch {
             throw new Error("Invalid response from storyboard API");
         }
-        const scenes = storyboardData.scenes;
+        const acts = storyboardData.acts;
 
-        if (!scenes || scenes.length === 0) {
-            throw new Error("No scenes returned from storyboard generation");
+        if (!acts || acts.length === 0) {
+            throw new Error("No acts returned from storyboard generation");
+        }
+
+        // Build act cards in the DOM
+        for (const act of acts) {
+            createActCard(act);
         }
 
         // Step 2: Upload photo once, then submit ALL images in parallel
         let completedCount = 0;
 
-        els.statusText.textContent = `Generating ${scenes.length} story scenes...`;
+        els.statusText.textContent = `Generating ${acts.length} act images...`;
         els.statusDetail.textContent = "Preparing image requests...";
 
-        // Upload photo once to avoid sending large base64 with every request
+        // Upload photo once
         const uploadResp = await fetch("/api/upload-photo", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ photo: userPhotoDataURI }),
         });
         if (!uploadResp.ok) throw new Error("Failed to upload photo");
-        const { photo_token } = await uploadResp.json();
+        const uploadData = await uploadResp.json();
+        photoToken = uploadData.photo_token;
 
         els.statusDetail.textContent = "Submitting image requests...";
 
-        // Submit all scenes to fal.ai queue simultaneously
+        // Submit all acts to fal.ai queue simultaneously
         const submissions = await Promise.all(
-            scenes.map(async (scene, i) => {
-                const sceneNum = scene.scene_number || i + 1;
+            acts.map(async (act, i) => {
+                const actNum = act.act_number || i + 1;
                 const submitResponse = await fetch("/api/generate-image", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        photo_token: photo_token,
-                        prompt: scene.prompt,
+                        photo_token: photoToken,
+                        prompt: act.prompt,
                         show_name: selectedShow,
-                        scene_number: sceneNum,
+                        scene_number: actNum,
                         gender: detectedGender,
                     }),
                 });
 
                 if (!submitResponse.ok) {
-                    let errMsg = `Failed to submit scene ${sceneNum}`;
+                    let errMsg = `Failed to submit act ${actNum}`;
                     try {
                         const text = await submitResponse.text();
                         try {
@@ -460,77 +699,70 @@ async function startGeneration() {
                 try {
                     submitData = await submitResponse.json();
                 } catch {
-                    throw new Error(`Invalid response submitting scene ${sceneNum}`);
+                    throw new Error(`Invalid response submitting act ${actNum}`);
                 }
 
-                return { scene, sceneNum, submitData };
+                return { act, actNum, submitData };
             })
         );
 
-        els.statusDetail.textContent = "All scenes submitted, waiting for results...";
+        els.statusDetail.textContent = "All acts submitted, waiting for results...";
 
-        // Pre-allocate arrays so parallel results land in correct order
-        generatedImages = new Array(scenes.length);
-        scenePrompts = new Array(scenes.length);
+        // Pre-allocate actData
+        actData = acts.map((act, i) => ({
+            act_number: act.act_number || i + 1,
+            title: act.title || "",
+            prompt: act.prompt,
+            scenes: act.scenes || [],
+            imageURL: null,
+        }));
 
-        // Poll all scenes in parallel, but reveal images sequentially
-        const imageResults = new Array(scenes.length);
-        const resolvers = new Array(scenes.length);
-        // Create a promise for each slot that resolves when that scene's image is ready
-        const readyPromises = scenes.map((_, i) => new Promise((resolve) => { resolvers[i] = resolve; }));
+        // Poll all acts in parallel, but reveal images sequentially
+        const imageResults = new Array(acts.length);
+        const resolvers = new Array(acts.length);
+        const readyPromises = acts.map((_, i) => new Promise((resolve) => { resolvers[i] = resolve; }));
 
-        // Parallel polling — each stores its result and signals ready
         const pollAll = Promise.all(
-            submissions.map(async ({ scene, sceneNum, submitData }, idx) => {
+            submissions.map(async ({ act, actNum, submitData }, idx) => {
                 const requestId = submitData.request_id;
                 let imageURL;
 
                 if (!requestId) {
                     imageURL = extractImageURL(submitData);
-                    if (!imageURL) throw new Error(`No image returned for scene ${sceneNum}`);
+                    if (!imageURL) throw new Error(`No image returned for act ${actNum}`);
                 } else {
-                    imageURL = await pollImageStatus(requestId, sceneNum);
+                    imageURL = await pollImageStatus(requestId, actNum);
                 }
 
-                imageResults[idx] = { imageURL, scene, sceneNum };
-                generatedImages[idx] = imageURL;
-                scenePrompts[idx] = scene.prompt;
+                imageResults[idx] = { imageURL, act, actNum };
+                actData[idx].imageURL = imageURL;
                 resolvers[idx]();
             })
         );
 
-        // Sequential display — wait for scene 1 first, then 2, etc.
-        for (let i = 0; i < scenes.length; i++) {
+        // Sequential display
+        for (let i = 0; i < acts.length; i++) {
             await readyPromises[i];
-            const { imageURL, scene, sceneNum } = imageResults[i];
-            showSceneImage(sceneNum, imageURL, scene.prompt);
+            const { imageURL, act, actNum } = imageResults[i];
+            showActImage(actNum, imageURL);
             completedCount++;
             const dots = ".".repeat((completedCount % 3) + 1);
-            els.statusText.textContent = `${completedCount} of ${scenes.length} scenes ready${dots}`;
-            els.statusDetail.textContent = scene.prompt;
+            els.statusText.textContent = `${completedCount} of ${acts.length} acts ready${dots}`;
+            els.statusDetail.textContent = act.prompt;
         }
 
         await pollAll;
 
-        // All scenes generated — show Generate Drama button
+        // All acts generated — hide status bar
         els.generateStatus.style.display = "none";
-        els.generateDramaBtn.style.display = "";
     } catch (error) {
         console.error("Generation error:", error);
         els.generateStatus.style.display = "none";
-        // If some images were generated, still allow generating drama with them
-        if (generatedImages.length > 0) {
-            els.generateDramaBtn.style.display = "";
-        }
         showError(error.message || "Something went wrong during generation");
     }
 }
 
 // ===== VIDEO GENERATION (CLIP-BY-CLIP) =====
-els.generateDramaBtn.addEventListener("click", () => {
-    startClipGeneration();
-});
-
 function resetClipsUI() {
     generatedClips = [];
     currentClipIndex = 0;
@@ -705,6 +937,9 @@ function onClipReady(index, videoUrl) {
     const totalClips = generatedImages.length;
     const isLastClip = index >= totalClips - 1;
 
+    // Show merge button when 2+ clips are ready
+    const readyCount = generatedClips.filter(Boolean).length;
+
     if (isLastClip) {
         // All clips done
         els.resultHeading.textContent = "Your Drama Clips Are Ready";
@@ -715,6 +950,8 @@ function onClipReady(index, videoUrl) {
         els.resultHeading.textContent = `Clip ${index + 1} of ${totalClips} Ready`;
         els.clipActions.style.display = "";
         els.nextClipBtn.style.display = "";
+        // Show merge button in clip-actions if 2+ clips ready
+        els.mergeClipsBtn.style.display = readyCount >= 2 ? "" : "none";
     }
 }
 
@@ -761,9 +998,61 @@ els.tryagainBtn.addEventListener("click", () => {
     scenePrompts = [];
     generatedClips = [];
     currentClipIndex = 0;
+    actData = [];
+    photoToken = null;
     detectedGender = null;
     selectedShow = null;
+    userName = null;
     els.clipsTimeline.innerHTML = "";
     els.customShowInput.value = "";
     showScreen("select");
 });
+
+// ===== MERGE CLIPS =====
+async function mergeClips(btn) {
+    const clipUrls = generatedClips.filter(Boolean);
+    if (clipUrls.length < 2) {
+        showError("Need at least 2 clips to merge.");
+        return;
+    }
+
+    const origText = btn.textContent;
+    btn.textContent = "Merging...";
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch("/api/merge-clips", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clip_urls: clipUrls }),
+        });
+
+        if (!resp.ok) {
+            let errMsg = "Failed to merge clips";
+            try {
+                const err = await resp.json();
+                errMsg = err.error || errMsg;
+            } catch {}
+            throw new Error(errMsg);
+        }
+
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `SoraShorts-${selectedShow.replace(/\s+/g, "-")}-merged.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+        console.error("Merge error:", error);
+        showError(error.message || "Failed to merge clips");
+    } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
+    }
+}
+
+els.mergeClipsBtn.addEventListener("click", () => mergeClips(els.mergeClipsBtn));
+els.mergeAllBtn.addEventListener("click", () => mergeClips(els.mergeAllBtn));

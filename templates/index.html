@@ -66,6 +66,9 @@
             <!-- Photo Preview -->
             <div class="preview-container" id="preview-container" style="display:none">
                 <img id="photo-preview" alt="Your photo">
+                <div class="name-input-wrap">
+                    <input type="text" id="user-name-input" placeholder="Enter your name" autocomplete="given-name">
+                </div>
                 <div class="preview-actions">
                     <button class="btn btn-secondary" id="retake-btn">Choose Another</button>
                     <button class="btn btn-primary" id="continue-btn">Continue</button>
@@ -203,46 +206,7 @@
         <div class="generate-container">
             <h2 class="storyboard-heading" id="storyboard-heading">Your Storyboard</h2>
             <div class="storyboard" id="storyboard">
-                <div class="storyboard-scene" data-scene="1">
-                    <div class="scene-card">
-                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
-                        <img class="scene-image" alt="Scene 1">
-                    </div>
-                    <div class="scene-tooltip"></div>
-                    <span class="scene-label">Scene 1</span>
-                </div>
-                <div class="storyboard-scene" data-scene="2">
-                    <div class="scene-card">
-                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
-                        <img class="scene-image" alt="Scene 2">
-                    </div>
-                    <div class="scene-tooltip"></div>
-                    <span class="scene-label">Scene 2</span>
-                </div>
-                <div class="storyboard-scene" data-scene="3">
-                    <div class="scene-card">
-                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
-                        <img class="scene-image" alt="Scene 3">
-                    </div>
-                    <div class="scene-tooltip"></div>
-                    <span class="scene-label">Scene 3</span>
-                </div>
-                <div class="storyboard-scene" data-scene="4">
-                    <div class="scene-card">
-                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
-                        <img class="scene-image" alt="Scene 4">
-                    </div>
-                    <div class="scene-tooltip"></div>
-                    <span class="scene-label">Scene 4</span>
-                </div>
-                <div class="storyboard-scene" data-scene="5">
-                    <div class="scene-card">
-                        <div class="scene-placeholder"><div class="spinner-small"></div></div>
-                        <img class="scene-image" alt="Scene 5">
-                    </div>
-                    <div class="scene-tooltip"></div>
-                    <span class="scene-label">Scene 5</span>
-                </div>
+                <!-- Act cards inserted dynamically by JS -->
             </div>
             <div class="generate-status" id="generate-status">
                 <div class="status-bar">
@@ -251,12 +215,6 @@
                 </div>
                 <p class="status-detail" id="status-detail">Casting you into the scene</p>
             </div>
-            <button class="btn btn-primary btn-generate-drama" id="generate-drama-btn" style="display:none">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/>
-                </svg>
-                Generate Drama
-            </button>
         </div>
     </div>
 
@@ -285,6 +243,14 @@
                     </svg>
                     Regenerate Clip
                 </button>
+                <button class="btn btn-primary" id="merge-clips-btn" style="display:none">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="20" height="20" rx="2"/>
+                        <line x1="12" y1="8" x2="12" y2="16"/>
+                        <line x1="8" y1="12" x2="16" y2="12"/>
+                    </svg>
+                    Merge Clips
+                </button>
                 <button class="btn btn-primary" id="next-clip-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="5" y1="12" x2="19" y2="12"/>
@@ -301,6 +267,14 @@
                         <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
                     Save All Clips
+                </button>
+                <button class="btn btn-primary" id="merge-all-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="20" height="20" rx="2"/>
+                        <line x1="12" y1="8" x2="12" y2="16"/>
+                        <line x1="8" y1="12" x2="16" y2="12"/>
+                    </svg>
+                    Merge Clips
                 </button>
                 <button class="btn btn-secondary" id="tryagain-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -319,6 +293,14 @@
             <img id="lightbox-image" alt="Enlarged scene">
             <p class="lightbox-caption" id="lightbox-caption"></p>
             <button class="lightbox-close" id="lightbox-close">&times;</button>
+        </div>
+    </div>
+
+    <!-- ============ VIDEO LIGHTBOX OVERLAY ============ -->
+    <div id="video-lightbox-overlay" class="overlay" style="display:none">
+        <div class="video-lightbox-content">
+            <video id="video-lightbox-player" autoplay loop playsinline></video>
+            <button class="lightbox-close" id="video-lightbox-close">&times;</button>
         </div>
     </div>
 

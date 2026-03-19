@@ -241,6 +241,32 @@ html, body {
     margin-bottom: 20px;
 }
 
+.name-input-wrap {
+    margin-bottom: 16px;
+}
+
+.name-input-wrap input {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: inherit;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.name-input-wrap input:focus {
+    border-color: var(--red);
+}
+
+.name-input-wrap input::placeholder {
+    color: var(--text-muted);
+}
+
 .preview-actions {
     display: flex;
     gap: 12px;
@@ -379,7 +405,6 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
     padding: 100px 20px 40px;
     min-height: 100vh;
 }
@@ -395,64 +420,165 @@ html, body {
 
 .storyboard {
     display: flex;
-    gap: 16px;
-    justify-content: center;
-    margin-bottom: 32px;
-    overflow-x: auto;
-    padding: 4px;
-    -webkit-overflow-scrolling: touch;
-}
-
-.storyboard-scene {
-    flex-shrink: 0;
-    display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 8px;
+    gap: 16px;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto 32px;
+    padding: 0 4px;
 }
 
-.scene-card {
-    position: relative;
-    width: 150px;
+/* Act card */
+.act-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+}
+
+.act-card:hover {
+    border-color: #555;
+}
+
+.act-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(229, 9, 20, 0.05);
+}
+
+.act-number {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    color: var(--red);
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.act-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.act-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 20px;
+}
+
+.act-thumbnail-wrap {
+    flex-shrink: 0;
+    width: 120px;
     aspect-ratio: 9/16;
-    border-radius: 10px;
+    border-radius: 8px;
     overflow: hidden;
     background: var(--bg-card);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
 }
 
-.scene-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.6);
-}
-
-.scene-image {
+.act-thumbnail-wrap img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: none;
     opacity: 0;
     transition: opacity 0.5s ease;
-}
-
-.scene-image.visible {
-    display: block;
-    opacity: 1;
     cursor: pointer;
 }
 
-.scene-placeholder {
+.act-thumbnail-wrap img.visible {
+    display: block;
+    opacity: 1;
+}
+
+.act-thumbnail-wrap video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.act-thumbnail-placeholder {
     position: absolute;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-secondary);
 }
 
-.scene-placeholder.hidden {
+.act-thumbnail-placeholder.hidden {
     display: none;
+}
+
+.act-scenes {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.act-scene-line {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    word-wrap: break-word;
+}
+
+.act-scene-line .scene-num {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.subscene-generating {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2;
+}
+
+/* Per-act generate button */
+.act-generate-btn {
+    flex-shrink: 0;
+    align-self: center;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    background: var(--red);
+    color: white;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.act-generate-btn:hover {
+    background: var(--red-hover);
+    box-shadow: 0 0 20px var(--glow);
+    transform: translateY(-1px);
+}
+
+.act-generate-btn.visible {
+    display: inline-flex;
+}
+
+.act-generate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .spinner-small {
@@ -464,17 +590,8 @@ html, body {
     animation: spin 0.8s linear infinite;
 }
 
-.scene-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
 .generate-status {
-    /* Match storyboard width: 5×150px cards + 4×16px gaps + 8px padding */
-    max-width: 822px;
+    max-width: 800px;
     width: 100%;
     margin: 0 auto;
 }
@@ -515,14 +632,6 @@ html, body {
     text-align: left;
     word-wrap: break-word;
     overflow-wrap: break-word;
-}
-
-.btn-generate-drama {
-    margin-top: 24px;
-    padding: 16px 40px;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
 }
 
 /* Spinner */
@@ -659,41 +768,6 @@ html, body {
     gap: 12px;
 }
 
-/* ===== SCENE TOOLTIP ===== */
-.storyboard-scene {
-    position: relative;
-}
-
-.scene-tooltip {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 240px;
-    padding: 12px 14px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text-secondary);
-    font-size: 12px;
-    line-height: 1.5;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
-    pointer-events: none;
-    z-index: 50;
-    margin-bottom: 8px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-}
-
-.scene-tooltip:empty {
-    display: none;
-}
-
-.storyboard-scene:hover .scene-tooltip {
-    opacity: 1;
-    visibility: visible;
-}
 
 /* ===== LIGHTBOX ===== */
 .lightbox-content {
@@ -740,6 +814,24 @@ html, body {
     justify-content: center;
     transition: background 0.2s ease;
     border: 1px solid var(--border);
+}
+
+/* Video lightbox */
+.video-lightbox-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-lightbox-content video {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 12px;
+    object-fit: contain;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
 }
 
 .lightbox-close:hover {
@@ -824,13 +916,13 @@ html, body {
         gap: 16px;
     }
 
-    .scene-card {
-        width: 120px;
+    .act-body {
+        flex-direction: column;
     }
 
-    .storyboard {
-        justify-content: flex-start;
-        padding: 4px 16px;
+    .act-thumbnail-wrap {
+        width: 100%;
+        max-width: 200px;
     }
 
     .clip-video-wrapper {

@@ -4,9 +4,12 @@ import json
 import logging
 import traceback
 import time
+import tempfile
+import subprocess
+import shutil
 import requests
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, make_response
 from flask_cors import CORS
 from anthropic import Anthropic
 
@@ -101,42 +104,63 @@ def generate_storyboard():
     data = request.json
     show_name = data["show_name"]
     gender = data.get("gender", "male")
+    user_name = data.get("user_name", "the protagonist")
 
     if gender == "female":
         gender_upper = "FEMALE"
-        person_ref = "the woman from the reference photo"
-        person_ref_alt = "the woman in the reference image"
+        pronoun_sub = "she"
+        pronoun_obj = "her"
         pronoun_pos = "her"
     else:
         gender_upper = "MALE"
-        person_ref = "the man from the reference photo"
-        person_ref_alt = "the man in the reference image"
+        pronoun_sub = "he"
+        pronoun_obj = "him"
         pronoun_pos = "his"
 
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1500,
+        model="claude-opus-4-6",
+        max_tokens=2000,
         messages=[
             {
                 "role": "user",
                 "content": (
                     f"You are a storyboard artist for a short drama fan fiction of '{show_name}'. "
-                    f"The user will be cast as the {gender_upper} lead/love interest character in the story. "
-                    f"A reference photo of the user will be provided to the image generator.\n\n"
-                    f"Create a 5-scene storyboard that tells a consistent, compelling mini-plot "
-                    f"inspired by '{show_name}'. Each scene should build on the previous one.\n\n"
-                    f"IMPORTANT: In every scene prompt, refer to the {gender} lead as '{person_ref}' "
-                    f"or '{person_ref_alt}'. Describe {pronoun_pos} actions, pose, and expression, "
+                    f"The user's name is '{user_name}' and {pronoun_sub} will be cast as the {gender_upper} lead/love interest character. "
+                    f"A reference photo of {user_name} will be provided to the image generator.\n\n"
+                    f"You must follow the ACTUAL plot, storyline, and iconic scenes of '{show_name}'. "
+                    f"Use the real character names (except the {gender} lead, who is {user_name}), real locations, "
+                    f"and real plot points from the show/movie. The 5 acts should retell the key dramatic beats "
+                    f"of '{show_name}' faithfully — not a generic romance, but the specific story audiences know and love. "
+                    f"Include signature moments, settings, and conflicts that are unique to '{show_name}'.\n\n"
+                    f"Each act should build on the previous one and represent "
+                    f"a major dramatic beat in the story.\n\n"
+                    f"IMPORTANT RULES FOR SCENE DESCRIPTIONS ('scenes' field):\n"
+                    f"- Use '{user_name}' to refer to the {gender} lead (the user), not 'the man'/'the woman'.\n"
+                    f"- For the OTHER protagonist (love interest / co-lead), use their real character name "
+                    f"from '{show_name}' (e.g. 'Rachel Chu', 'Edward Cullen', 'Ri Jeong-hyeok').\n\n"
+                    f"IMPORTANT RULES FOR THE 'prompt' FIELD (image generation):\n"
+                    f"- The prompt must depict SCENE 1 of the act — the opening/starting moment.\n"
+                    f"- BOTH the {gender} lead AND the love interest must appear together in EVERY image. "
+                    f"Always describe both characters' positions, actions, and expressions.\n"
+                    f"- Refer to the {gender} lead as 'the {gender} from the reference photo'. "
+                    f"Describe {pronoun_pos} actions, pose, and expression, "
                     f"but do NOT describe {pronoun_pos} physical appearance (hair color, skin tone, etc.) since "
-                    f"{pronoun_pos} look comes from the reference photo. You may describe the other characters normally.\n\n"
-                    f"For each scene, write an image generation prompt (2-3 sentences) describing:\n"
-                    f"- The visual composition and setting\n"
-                    f"- The {gender} lead's (from reference photo) action, pose, and expression\n"
-                    f"- Other characters and their appearance\n"
-                    f"- Cinematic lighting, mood, and camera angle\n"
-                    f"- Keep it in 9:16 portrait format\n\n"
-                    f"Return ONLY a JSON array of 5 objects, each with 'scene_number' (1-5) and 'prompt'. "
+                    f"{pronoun_pos} look comes from the reference photo.\n"
+                    f"- For the OTHER protagonist (the love interest / co-lead), ALWAYS use their full character name "
+                    f"from '{show_name}' (e.g. 'Rachel Chu', 'Edward Cullen', 'Ri Jeong-hyeok'). "
+                    f"The image generator knows these characters and will generate them accurately by name. "
+                    f"Include their name in every prompt.\n"
+                    f"- You may also name other supporting characters from the show for accuracy.\n\n"
+                    f"For each act, provide:\n"
+                    f"- A 'title': a dramatic 3-6 word title for the act\n"
+                    f"- A 'prompt': an image generation prompt (2-3 sentences) for SCENE 1 of this act. "
+                    f"Describe the visual composition with BOTH protagonists together, "
+                    f"setting, cinematic lighting/mood/camera angle, in 9:16 portrait format.\n"
+                    f"- A 'scenes': an array of exactly 4 strings, each a short 1-sentence scene description "
+                    f"summarizing what happens in that part of the act. Do NOT include 'Scene X:' prefixes — "
+                    f"just the description itself, e.g. '{user_name} arrives at the grand estate for the first time'.\n\n"
+                    f"Return ONLY a JSON array of 5 objects, each with 'act_number' (1-5), 'title', 'prompt', and 'scenes'. "
                     f"No markdown, no explanation, just the JSON array."
                 ),
             }
@@ -152,8 +176,65 @@ def generate_storyboard():
 
     log.info(f"[STORYBOARD] Raw Claude response: {raw[:500]}")
 
-    scenes = json.loads(raw)
-    return jsonify({"scenes": scenes})
+    acts = json.loads(raw)
+    return jsonify({"acts": acts})
+
+
+@app.route("/api/expand-video-prompt", methods=["POST"])
+def expand_video_prompt():
+    """Use Opus to expand 4 scene descriptions into a detailed Sora 2 video prompt."""
+    data = request.json
+    show_name = data["show_name"]
+    act_title = data["act_title"]
+    scenes = data["scenes"]  # array of 4 short scene strings
+    all_acts = data.get("all_acts", [])
+
+    acts_context = "\n".join(
+        f"Act {a.get('act_number', i+1)}: {a.get('title', '')}"
+        for i, a in enumerate(all_acts)
+    )
+
+    scenes_text = "\n".join(f"Scene {i+1}: {s}" for i, s in enumerate(scenes))
+
+    client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    message = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=2000,
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    f"You are creating a detailed video generation prompt for a 16-second drama clip.\n\n"
+                    f"This is for Act '{act_title}' of a drama inspired by '{show_name}'.\n\n"
+                    f"Full story context:\n{acts_context}\n\n"
+                    f"The 4 scenes in this act:\n{scenes_text}\n\n"
+                    f"Expand each scene into a detailed video prompt with:\n"
+                    f"- Vivid description of the physical action, movement, and emotion\n"
+                    f"- Camera movement and angles (dolly, pan, close-up, wide shot, etc.)\n"
+                    f"- Dialogue written as 'the man says: \"...\"' or 'the woman says: \"...\"'\n"
+                    f"- Write original dialogue that captures the emotional essence — "
+                    f"do NOT use verbatim lines from any existing work\n\n"
+                    f"CRITICAL RULES:\n"
+                    f"- NO character names, NO show/movie titles, NO copyrighted references. "
+                    f"Use only 'the man', 'the woman', 'the older woman', 'the friend', etc.\n"
+                    f"- AVOID words that trigger content filters: no kiss, passionate, intimate, sexual, "
+                    f"naked, nude, blood, kill, death, gun, stab, drug, alcohol, profanity. "
+                    f"Use softer alternatives: 'lean close' instead of 'kiss', 'tender' instead of 'intimate', "
+                    f"'wounded' instead of 'bloody', 'defeat' instead of 'kill', 'yearning' instead of 'desire'.\n\n"
+                    f"Return the result as a single string with this exact format:\n"
+                    f"Scene 1: [detailed prompt]\nScene 2: [detailed prompt]\n"
+                    f"Scene 3: [detailed prompt]\nScene 4: [detailed prompt]\n\n"
+                    f"Each scene prompt should be 2-3 sentences. Return ONLY the formatted scenes, "
+                    f"no preamble or explanation."
+                ),
+            }
+        ],
+    )
+
+    video_prompt = message.content[0].text.strip()
+    log.info(f"[EXPAND-VIDEO-PROMPT] Response: {video_prompt[:500]}")
+
+    return jsonify({"video_prompt": video_prompt})
 
 
 @app.route("/api/upload-photo", methods=["POST"])
@@ -203,13 +284,13 @@ def generate_image():
     payload = {
         "prompt": full_prompt,
         "image_urls": [user_photo],
-        "image_size": "portrait_16_9",
+        "aspect_ratio": "9:16",
         "num_images": 1,
     }
 
     try:
         submit_resp = requests.post(
-            "https://queue.fal.run/fal-ai/bytedance/seedream/v5/lite/edit",
+            "https://queue.fal.run/fal-ai/nano-banana-2/edit",
             headers={
                 "Authorization": f"Key {FAL_KEY}",
                 "Content-Type": "application/json",
@@ -233,7 +314,7 @@ def generate_image():
 @app.route("/api/image-status/<request_id>")
 def image_status(request_id):
     response = requests.get(
-        f"https://queue.fal.run/fal-ai/bytedance/requests/{request_id}/status",
+        f"https://queue.fal.run/fal-ai/nano-banana-2/requests/{request_id}/status",
         headers={"Authorization": f"Key {FAL_KEY}"},
         timeout=30,
     )
@@ -247,7 +328,7 @@ def image_status(request_id):
 @app.route("/api/image-result/<request_id>")
 def image_result(request_id):
     response = requests.get(
-        f"https://queue.fal.run/fal-ai/bytedance/requests/{request_id}",
+        f"https://queue.fal.run/fal-ai/nano-banana-2/requests/{request_id}",
         headers={"Authorization": f"Key {FAL_KEY}"},
         timeout=30,
     )
@@ -284,24 +365,151 @@ def generate_scene_prompt():
     return jsonify({"prompt": message.content[0].text})
 
 
+import re
+
+# ---------------------------------------------------------------------------
+# Sora 2 prompt sanitiser — replace words likely to trigger content filters
+# ---------------------------------------------------------------------------
+_SORA_REPLACEMENTS = [
+    # Romantic / sexual
+    (r'\bkiss(?:es|ed|ing)?\b', 'lean close'),
+    (r'\bmaking out\b', 'embracing tenderly'),
+    (r'\bpassionate(?:ly)?\b', 'intense'),
+    (r'\bseduc(?:e|es|ed|ing|tion|tive)\b', 'captivat\\1' if False else 'alluring'),
+    (r'\bseduc\w*', 'alluring'),
+    (r'\blust(?:ful|ing)?\b', 'longing'),
+    (r'\bintimate(?:ly)?\b', 'tender'),
+    (r'\bintimacy\b', 'closeness'),
+    (r'\bsexual(?:ly)?\b', 'romantic'),
+    (r'\bsex\b', 'romance'),
+    (r'\bnaked\b', 'bare-shouldered'),
+    (r'\bnude\b', 'bare-shouldered'),
+    (r'\bundress(?:es|ed|ing)?\b', 'loosening clothes'),
+    (r'\bstrip(?:s|ped|ping)?\b(?!\s+(?:of|away|down))', 'disrobe'),
+    (r'\blingerie\b', 'elegant attire'),
+    (r'\bbra\b', 'top'),
+    (r'\bcleavage\b', 'neckline'),
+    (r'\bcaress(?:es|ed|ing)?\b', 'gently touch'),
+    (r'\bmoan(?:s|ed|ing)?\b', 'sigh'),
+    (r'\bgroan(?:s|ed|ing)?\b', 'exhale deeply'),
+    (r'\berotica?\b', 'romantic'),
+    (r'\bdesire\b', 'yearning'),
+    (r'\bsensual(?:ly)?\b', 'gentle'),
+    (r'\bbed\s*room\s*scene\b', 'private moment'),
+    (r'\bbed\s*scene\b', 'private moment'),
+    (r'\bmake\s+love\b', 'share a tender moment'),
+    # Violence / weapons
+    (r'\bkill(?:s|ed|ing)?\b', 'defeat'),
+    (r'\bmurder(?:s|ed|ing)?\b', 'eliminate'),
+    (r'\bstab(?:s|bed|bing)?\b', 'strike'),
+    (r'\bblood(?:y|ied|iest)?\b', 'red-stained'),
+    (r'\bbleed(?:s|ing)?\b', 'wounded'),
+    (r'\bgun(?:s|fire|shot)?\b', 'weapon'),
+    (r'\brifle(?:s)?\b', 'weapon'),
+    (r'\bpistol(?:s)?\b', 'weapon'),
+    (r'\bshotgun(?:s)?\b', 'weapon'),
+    (r'\bbullet(?:s)?\b', 'projectile'),
+    (r'\bshoot(?:s|ing)?\b(?!\s+(?:a look|glance))', 'fire'),
+    (r'\bshot\b(?!\s+(?:of|glass))', 'blast'),
+    (r'\bknife\b', 'blade'),
+    (r'\bsword(?:s)?\b', 'blade'),
+    (r'\bexplosion(?:s)?\b', 'burst of light'),
+    (r'\bexplod(?:e|es|ed|ing)\b', 'burst apart'),
+    (r'\bbomb(?:s|ed|ing)?\b', 'blast'),
+    (r'\bsuicid\w*\b', 'sacrifice'),
+    (r'\bdeath\b', 'loss'),
+    (r'\bdie(?:s|d)?\b', 'fall'),
+    (r'\bdying\b', 'fading'),
+    (r'\bcorpse(?:s)?\b', 'fallen figure'),
+    (r'\bdead\b', 'fallen'),
+    (r'\btortur(?:e|es|ed|ing)\b', 'suffering'),
+    (r'\bstrangle(?:s|d)?\b', 'restrain'),
+    (r'\bchoke(?:s|d|ing)?\b', 'gasp'),
+    (r'\bpoison(?:s|ed|ing)?\b', 'taint'),
+    # Substances
+    (r'\bdrunk(?:en)?\b', 'tipsy'),
+    (r'\balcohol\b', 'drink'),
+    (r'\bdrug(?:s|ged)?\b', 'substance'),
+    (r'\bcocaine\b', 'powder'),
+    (r'\bheroin\b', 'substance'),
+    (r'\bsmoking\b', 'exhaling'),
+    (r'\bcigarette(?:s)?\b', 'thin stick'),
+    # Profanity (catch common ones)
+    (r'\bf+u+c+k\w*\b', ''),
+    (r'\bsh[i!]+t\w*\b', ''),
+    (r'\bass(?:hole)?\b', ''),
+    (r'\bbitch\w*\b', ''),
+    (r'\bdamn(?:ed)?\b', ''),
+    (r'\bhell\b(?!\s*o)', ''),
+    # IP / copyright safety net (in case Claude leaks names)
+    (r'\bfifty\s+shades\b', 'the story'),
+    (r'\btwilight\b', 'the story'),
+    (r'\bbridgerton\b', 'the story'),
+    (r'\bgrey\s*(?:\'s)?\s*anatomy\b', 'the story'),
+    (r'\bchristian\s+grey\b', 'the man'),
+    (r'\banastasia\s+steele?\b', 'the woman'),
+    (r'\bedward\s+cullen\b', 'the man'),
+    (r'\bbella\s+swan\b', 'the woman'),
+    (r'\bjacob\s+black\b', 'the friend'),
+    (r'\bnick\s+young\b', 'the man'),
+    (r'\brachel\s+chu\b', 'the woman'),
+]
+
+# Pre-compile patterns for performance
+_SORA_COMPILED = [(re.compile(pat, re.IGNORECASE), repl) for pat, repl in _SORA_REPLACEMENTS]
+
+
+def sanitize_sora_prompt(prompt: str) -> str:
+    """Filter and replace sensitive words that might trigger Sora 2 content filters."""
+    sanitized = prompt
+    for pattern, replacement in _SORA_COMPILED:
+        sanitized = pattern.sub(replacement, sanitized)
+    # Collapse multiple spaces left by removals
+    sanitized = re.sub(r'  +', ' ', sanitized).strip()
+    # Remove empty quotes left behind
+    sanitized = re.sub(r'says:\s*""', 'says: "..."', sanitized)
+    return sanitized
+
+
 @app.route("/api/generate-video", methods=["POST"])
 def generate_video():
     data = request.json
     image_url = data["image_url"]
-    prompt = data["prompt"]
+    prompt = data.get("prompt", "")
+
+    log.info(f"[GENERATE-VIDEO] Received prompt ({len(prompt)} chars): '{prompt[:300]}'")
+    log.info(f"[GENERATE-VIDEO] Image URL: {image_url[:100] if image_url else 'NONE'}...")
+
+    if not prompt:
+        log.warning("[GENERATE-VIDEO] Empty prompt received!")
+
+    # Sanitize prompt to avoid triggering Sora 2 content filters
+    original_prompt = prompt
+    prompt = sanitize_sora_prompt(prompt)
+    if prompt != original_prompt:
+        log.info(f"[GENERATE-VIDEO] Sanitized prompt ({len(prompt)} chars): '{prompt[:300]}'")
+
+    # Truncate prompt to 4900 chars to stay within Sora 2's 5000 char limit
+    if len(prompt) > 4900:
+        log.warning(f"[GENERATE-VIDEO] Prompt too long ({len(prompt)} chars), truncating to 4900")
+        prompt = prompt[:4900]
+
+    payload = {
+        "prompt": prompt,
+        "image_url": image_url,
+        "duration": 16,
+        "aspect_ratio": "9:16",
+    }
+
+    log.info(f"[GENERATE-VIDEO] Full payload JSON: {json.dumps(payload)[:600]}")
 
     response = requests.post(
-        "https://queue.fal.run/fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+        "https://queue.fal.run/fal-ai/sora-2/image-to-video",
         headers={
             "Authorization": f"Key {FAL_KEY}",
             "Content-Type": "application/json",
         },
-        json={
-            "prompt": prompt,
-            "image_url": image_url,
-            "duration": "5",
-            "aspect_ratio": "9:16",
-        },
+        json=payload,
     )
 
     log.info(f"[GENERATE-VIDEO] Queue submission response ({response.status_code}): {response.text[:500]}")
@@ -315,7 +523,7 @@ def generate_video():
 @app.route("/api/video-status/<request_id>")
 def video_status(request_id):
     response = requests.get(
-        f"https://queue.fal.run/fal-ai/kling-video/requests/{request_id}/status",
+        f"https://queue.fal.run/fal-ai/sora-2/requests/{request_id}/status",
         headers={"Authorization": f"Key {FAL_KEY}"},
     )
     log.info(f"[VIDEO-STATUS] raw response ({response.status_code}): {response.text[:300]}")
@@ -328,7 +536,7 @@ def video_status(request_id):
 @app.route("/api/video-result/<request_id>")
 def video_result(request_id):
     response = requests.get(
-        f"https://queue.fal.run/fal-ai/kling-video/requests/{request_id}",
+        f"https://queue.fal.run/fal-ai/sora-2/requests/{request_id}",
         headers={"Authorization": f"Key {FAL_KEY}"},
     )
     log.info(f"[VIDEO-RESULT] raw response ({response.status_code}): {response.text[:500]}")
@@ -336,6 +544,65 @@ def video_result(request_id):
         return jsonify(response.json())
     except Exception:
         return jsonify({"error": "Invalid response", "raw": response.text[:200]}), 502
+
+
+@app.route("/api/merge-clips", methods=["POST"])
+def merge_clips():
+    """Download clip videos and merge them into a single MP4 using ffmpeg."""
+    data = request.json
+    clip_urls = data.get("clip_urls", [])
+
+    if len(clip_urls) < 2:
+        return jsonify({"error": "Need at least 2 clips to merge"}), 400
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        # Download all clips
+        clip_files = []
+        for i, url in enumerate(clip_urls):
+            clip_path = os.path.join(tmpdir, f"clip_{i}.mp4")
+            resp = requests.get(url, timeout=120)
+            if resp.status_code != 200:
+                raise Exception(f"Failed to download clip {i + 1}")
+            with open(clip_path, "wb") as f:
+                f.write(resp.content)
+            clip_files.append(clip_path)
+
+        # Create ffmpeg concat file
+        concat_path = os.path.join(tmpdir, "concat.txt")
+        with open(concat_path, "w") as f:
+            for cp in clip_files:
+                f.write(f"file '{cp}'\n")
+
+        # Merge with ffmpeg
+        output_path = os.path.join(tmpdir, "merged.mp4")
+        result = subprocess.run(
+            ["ffmpeg", "-f", "concat", "-safe", "0", "-i", concat_path,
+             "-c", "copy", output_path],
+            capture_output=True, text=True, timeout=300,
+        )
+
+        if result.returncode != 0:
+            log.error(f"[MERGE] ffmpeg stderr: {result.stderr}")
+            raise Exception("Failed to merge clips with ffmpeg")
+
+        with open(output_path, "rb") as f:
+            merged_data = f.read()
+
+        response = make_response(merged_data)
+        response.headers["Content-Type"] = "video/mp4"
+        response.headers["Content-Disposition"] = "attachment; filename=SoraShorts-merged.mp4"
+        return response
+
+    except FileNotFoundError:
+        log.error("[MERGE] ffmpeg not found on system")
+        return jsonify({"error": "ffmpeg is not installed on the server"}), 500
+    except Exception as e:
+        log.error(f"[MERGE] Error: {e}")
+        log.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":

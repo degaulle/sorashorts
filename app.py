@@ -4,6 +4,7 @@ import json
 import logging
 import traceback
 import time
+import re
 import tempfile
 import subprocess
 import shutil
@@ -118,54 +119,61 @@ def generate_storyboard():
         pronoun_pos = "his"
 
     client = Anthropic(api_key=ANTHROPIC_API_KEY)
-    message = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=2000,
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f"You are a storyboard artist for a short drama fan fiction of '{show_name}'. "
-                    f"The user's name is '{user_name}' and {pronoun_sub} will be cast as the {gender_upper} lead/love interest character. "
-                    f"A reference photo of {user_name} will be provided to the image generator.\n\n"
-                    f"You must follow the ACTUAL plot, storyline, and iconic scenes of '{show_name}'. "
-                    f"Use the real character names (except the {gender} lead, who is {user_name}), real locations, "
-                    f"and real plot points from the show/movie. The 5 acts should retell the key dramatic beats "
-                    f"of '{show_name}' faithfully — not a generic romance, but the specific story audiences know and love. "
-                    f"Include signature moments, settings, and conflicts that are unique to '{show_name}'.\n\n"
-                    f"Each act should build on the previous one and represent "
-                    f"a major dramatic beat in the story.\n\n"
-                    f"IMPORTANT RULES FOR SCENE DESCRIPTIONS ('scenes' field):\n"
-                    f"- Use '{user_name}' to refer to the {gender} lead (the user), not 'the man'/'the woman'.\n"
-                    f"- For the OTHER protagonist (love interest / co-lead), use their real character name "
-                    f"from '{show_name}' (e.g. 'Rachel Chu', 'Edward Cullen', 'Ri Jeong-hyeok').\n\n"
-                    f"IMPORTANT RULES FOR THE 'prompt' FIELD (image generation):\n"
-                    f"- The prompt must depict SCENE 1 of the act — the opening/starting moment.\n"
-                    f"- BOTH the {gender} lead AND the love interest must appear together in EVERY image. "
-                    f"Always describe both characters' positions, actions, and expressions.\n"
-                    f"- Refer to the {gender} lead as 'the {gender} from the reference photo'. "
-                    f"Describe {pronoun_pos} actions, pose, and expression, "
-                    f"but do NOT describe {pronoun_pos} physical appearance (hair color, skin tone, etc.) since "
-                    f"{pronoun_pos} look comes from the reference photo.\n"
-                    f"- For the OTHER protagonist (the love interest / co-lead), ALWAYS use their full character name "
-                    f"from '{show_name}' (e.g. 'Rachel Chu', 'Edward Cullen', 'Ri Jeong-hyeok'). "
-                    f"The image generator knows these characters and will generate them accurately by name. "
-                    f"Include their name in every prompt.\n"
-                    f"- You may also name other supporting characters from the show for accuracy.\n\n"
-                    f"For each act, provide:\n"
-                    f"- A 'title': a dramatic 3-6 word title for the act\n"
-                    f"- A 'prompt': an image generation prompt (2-3 sentences) for SCENE 1 of this act. "
-                    f"Describe the visual composition with BOTH protagonists together, "
-                    f"setting, cinematic lighting/mood/camera angle, in 9:16 portrait format.\n"
-                    f"- A 'scenes': an array of exactly 4 strings, each a short 1-sentence scene description "
-                    f"summarizing what happens in that part of the act. Do NOT include 'Scene X:' prefixes — "
-                    f"just the description itself, e.g. '{user_name} arrives at the grand estate for the first time'.\n\n"
-                    f"Return ONLY a JSON array of 5 objects, each with 'act_number' (1-5), 'title', 'prompt', and 'scenes'. "
-                    f"No markdown, no explanation, just the JSON array."
-                ),
-            }
-        ],
-    )
+
+    try:
+        log.info(f"[STORYBOARD] Calling Claude for show='{show_name}', gender={gender}, user_name='{user_name}'")
+        message = client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=2000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        f"You are a storyboard artist for a short drama fan fiction of '{show_name}'. "
+                        f"The user's name is '{user_name}' and {pronoun_sub} will be cast as the {gender_upper} lead/love interest character. "
+                        f"A reference photo of {user_name} will be provided to the image generator.\n\n"
+                        f"You must follow the ACTUAL plot, storyline, and iconic scenes of '{show_name}'. "
+                        f"Use the real character names (except the {gender} lead, who is {user_name}), real locations, "
+                        f"and real plot points from the show/movie. The 5 acts should retell the key dramatic beats "
+                        f"of '{show_name}' faithfully — not a generic romance, but the specific story audiences know and love. "
+                        f"Include signature moments, settings, and conflicts that are unique to '{show_name}'.\n\n"
+                        f"Each act should build on the previous one and represent "
+                        f"a major dramatic beat in the story.\n\n"
+                        f"IMPORTANT RULES FOR SCENE DESCRIPTIONS ('scenes' field):\n"
+                        f"- Use '{user_name}' to refer to the {gender} lead (the user), not 'the man'/'the woman'.\n"
+                        f"- For the OTHER protagonist (love interest / co-lead), use their real character name "
+                        f"from '{show_name}' (e.g. 'Rachel Chu', 'Edward Cullen', 'Ri Jeong-hyeok').\n\n"
+                        f"IMPORTANT RULES FOR THE 'prompt' FIELD (image generation):\n"
+                        f"- The prompt must depict SCENE 1 of the act — the opening/starting moment.\n"
+                        f"- BOTH the {gender} lead AND the love interest must appear together in EVERY image. "
+                        f"Always describe both characters' positions, actions, and expressions.\n"
+                        f"- Refer to the {gender} lead as 'the {gender} from the reference photo'. "
+                        f"Describe {pronoun_pos} actions, pose, and expression, "
+                        f"but do NOT describe {pronoun_pos} physical appearance (hair color, skin tone, etc.) since "
+                        f"{pronoun_pos} look comes from the reference photo.\n"
+                        f"- For the OTHER protagonist (the love interest / co-lead), ALWAYS use their full character name "
+                        f"from '{show_name}' (e.g. 'Rachel Chu', 'Edward Cullen', 'Ri Jeong-hyeok'). "
+                        f"The image generator knows these characters and will generate them accurately by name. "
+                        f"Include their name in every prompt.\n"
+                        f"- You may also name other supporting characters from the show for accuracy.\n\n"
+                        f"For each act, provide:\n"
+                        f"- A 'title': a dramatic 3-6 word title for the act\n"
+                        f"- A 'prompt': an image generation prompt (2-3 sentences) for SCENE 1 of this act. "
+                        f"Describe the visual composition with BOTH protagonists together, "
+                        f"setting, cinematic lighting/mood/camera angle, in 9:16 portrait format.\n"
+                        f"- A 'scenes': an array of exactly 4 strings, each a short 1-sentence scene description "
+                        f"summarizing what happens in that part of the act. Do NOT include 'Scene X:' prefixes — "
+                        f"just the description itself, e.g. '{user_name} arrives at the grand estate for the first time'.\n\n"
+                        f"Return ONLY a JSON array of 5 objects, each with 'act_number' (1-5), 'title', 'prompt', and 'scenes'. "
+                        f"No markdown, no explanation, just the JSON array."
+                    ),
+                }
+            ],
+        )
+    except Exception as e:
+        log.error(f"[STORYBOARD] Claude API error: {e}")
+        log.error(traceback.format_exc())
+        return jsonify({"error": f"Claude API error: {str(e)}"}), 502
 
     raw = message.content[0].text.strip()
     # Strip markdown code fences if present
@@ -176,7 +184,13 @@ def generate_storyboard():
 
     log.info(f"[STORYBOARD] Raw Claude response: {raw[:500]}")
 
-    acts = json.loads(raw)
+    try:
+        acts = json.loads(raw)
+    except json.JSONDecodeError as e:
+        log.error(f"[STORYBOARD] JSON parse error: {e}")
+        log.error(f"[STORYBOARD] Raw text: {raw[:1000]}")
+        return jsonify({"error": "Failed to parse storyboard response"}), 502
+
     return jsonify({"acts": acts})
 
 
@@ -364,8 +378,6 @@ def generate_scene_prompt():
 
     return jsonify({"prompt": message.content[0].text})
 
-
-import re
 
 # ---------------------------------------------------------------------------
 # Sora 2 prompt sanitiser — replace words likely to trigger content filters

@@ -337,6 +337,48 @@ function extractImageURL(imageData) {
     return null;
 }
 
+// ===== CIRCULAR PROGRESS RING =====
+const RING_CIRCUMFERENCE = 2 * Math.PI * 26; // r=26
+
+function createProgressRing(large) {
+    const wrap = document.createElement("div");
+    wrap.className = "progress-ring" + (large ? " large" : "");
+    wrap.innerHTML = `
+        <svg viewBox="0 0 60 60">
+            <circle class="progress-ring-bg" cx="30" cy="30" r="26" />
+            <circle class="progress-ring-fill" cx="30" cy="30" r="26"
+                style="stroke-dasharray: ${RING_CIRCUMFERENCE}; stroke-dashoffset: ${RING_CIRCUMFERENCE}" />
+        </svg>
+        <span class="progress-ring-text">0%</span>`;
+    const fill = wrap.querySelector(".progress-ring-fill");
+    const text = wrap.querySelector(".progress-ring-text");
+
+    wrap.setProgress = (pct) => {
+        const clamped = Math.min(Math.max(pct, 0), 99);
+        fill.style.strokeDashoffset = RING_CIRCUMFERENCE - (clamped / 100) * RING_CIRCUMFERENCE;
+        text.textContent = `${Math.round(clamped)}%`;
+    };
+    wrap.complete = () => {
+        fill.style.strokeDashoffset = 0;
+        text.textContent = "100%";
+        if (wrap._timer) { clearInterval(wrap._timer); wrap._timer = null; }
+    };
+    return wrap;
+}
+
+function startProgressTimer(ring, durationMs) {
+    const start = Date.now();
+    ring._timer = setInterval(() => {
+        const pct = ((Date.now() - start) / durationMs) * 100;
+        ring.setProgress(pct); // auto-capped at 99
+        if (pct >= 99) { clearInterval(ring._timer); ring._timer = null; }
+    }, 500);
+}
+
+function stopProgressTimer(ring) {
+    if (ring && ring._timer) { clearInterval(ring._timer); ring._timer = null; }
+}
+
 // ===== STORYBOARD GENERATION =====
 function resetStoryboard() {
     generatedImages = [];
@@ -373,7 +415,9 @@ function createActCard(act) {
     thumbWrap.className = "act-thumbnail-wrap";
     const placeholder = document.createElement("div");
     placeholder.className = "act-thumbnail-placeholder";
-    placeholder.innerHTML = '<div class="spinner-small"></div>';
+    const imgRing = createProgressRing(false);
+    placeholder.appendChild(imgRing);
+    startProgressTimer(imgRing, 60000); // 1 min expected
     const img = document.createElement("img");
     img.alt = `Act ${actNum}`;
     thumbWrap.appendChild(placeholder);
@@ -417,12 +461,16 @@ function showActImage(actNumber, imageURL) {
     const img = card.querySelector(".act-thumbnail-wrap img");
     const placeholder = card.querySelector(".act-thumbnail-placeholder");
     const genBtn = card.querySelector(".act-generate-btn");
+    const ring = placeholder.querySelector(".progress-ring");
 
     img.src = imageURL;
     img.onload = () => {
-        placeholder.classList.add("hidden");
-        img.classList.add("visible");
-        genBtn.classList.add("visible");
+        if (ring) { ring.complete(); }
+        setTimeout(() => {
+            placeholder.classList.add("hidden");
+            img.classList.add("visible");
+            genBtn.classList.add("visible");
+        }, 300);
     };
 
     img.onclick = () => openLightbox(imageURL, actData.find(a => a.act_number === actNumber)?.prompt || "");
@@ -469,12 +517,14 @@ async function generateActVideo(actNumber) {
             throw new Error("Video prompt expansion returned empty result");
         }
 
-        // Step 2: Show spinner on thumbnail, submit to Sora 2
+        // Step 2: Show progress ring on thumbnail, submit to Sora 2
         genBtn.innerHTML = `<div class="spinner-small" style="width:16px;height:16px;"></div> Generating video...`;
 
         const overlay = document.createElement("div");
         overlay.className = "subscene-generating";
-        overlay.innerHTML = '<div class="spinner-small"></div>';
+        const vidRing = createProgressRing(true);
+        overlay.appendChild(vidRing);
+        startProgressTimer(vidRing, 300000); // 5 min expected
         thumbWrap.appendChild(overlay);
 
         const videoPayload = {
@@ -505,6 +555,7 @@ async function generateActVideo(actNumber) {
         }
 
         // Remove overlay
+        stopProgressTimer(vidRing);
         const ov = thumbWrap.querySelector(".subscene-generating");
         if (ov) ov.remove();
 
@@ -531,6 +582,7 @@ async function generateActVideo(actNumber) {
 
     } catch (error) {
         console.error(`Generate act ${actNumber} video error:`, error);
+        stopProgressTimer(vidRing);
         const ov = thumbWrap.querySelector(".subscene-generating");
         if (ov) ov.remove();
         genBtn.disabled = false;

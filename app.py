@@ -123,7 +123,7 @@ def generate_storyboard():
     try:
         log.info(f"[STORYBOARD] Calling Claude for show='{show_name}', gender={gender}, user_name='{user_name}'")
         message = client.messages.create(
-            model="claude-opus-4-6",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[
                 {
